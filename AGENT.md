@@ -1,6 +1,7 @@
 # Agent Guide
 
-This repository contains `t212`, an unofficial Trading 212 CLI for humans and AI agents.
+This repository contains `t212-cli`, an unofficial Trading 212 CLI for humans and AI
+agents. The npm package exposes both `t212` and `t212-cli` binaries.
 Treat all live Trading 212 write actions as high-risk: live orders and cancellations can
 affect real money.
 
@@ -24,6 +25,8 @@ Use these commands from the repo root:
 ```sh
 pnpm install
 pnpm generate:types
+pnpm clean
+pnpm build
 pnpm lint
 pnpm format:check
 pnpm typecheck
@@ -40,8 +43,8 @@ Use `pnpm format` only when intentionally applying formatting changes.
 
 ## Source Layout
 
-- `bin/t212.js`: npm executable shim that imports the TypeScript entrypoint.
-- `src/cli.ts`: TypeScript entrypoint, intended to run directly with Node.js 24.
+- `src/cli.ts`: TypeScript entrypoint, intended to run directly with Node.js 24 in development.
+- `dist/`: generated JavaScript for npm publishing. Do not edit manually.
 - `src/cli/app.ts`: Commander command tree and global options.
 - `src/cli/run.ts`: top-level parse/error boundary.
 - `src/commands/`: command groups and request/payload mapping.
@@ -65,6 +68,19 @@ pnpm generate:types
 Do not hand-edit `src/generated/trading212.ts`. If generated output ever violates
 `erasableSyntaxOnly`, fix the generator options or add a deterministic post-generation
 step rather than weakening the TypeScript constraints.
+
+## Publishing Artifact
+
+Do not publish TypeScript-only artifacts for this CLI. Node supports type stripping for
+local files, but refuses TypeScript under `node_modules`. npm publishes should include
+compiled JavaScript from `dist/`.
+
+This is a bin-only CLI with no public import API, so declaration files are intentionally
+not emitted. If a public programmatic API is added later, revisit declaration generation
+and ensure emitted declarations do not reference unpublished `.ts` specifiers.
+
+Run `pnpm build` before package dry-runs. `npm publish` and `npm pack --dry-run` also run
+the `prepack` script, which regenerates OpenAPI types and rebuilds `dist/`.
 
 ## Authentication
 

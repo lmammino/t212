@@ -12,7 +12,7 @@ The workflow file is:
 The npm package name is currently:
 
 ```text
-t212
+t212-cli
 ```
 
 The GitHub repository is:
@@ -21,11 +21,18 @@ The GitHub repository is:
 lmammino/t212
 ```
 
-As of the latest local check, `t212` was not published on npm. Re-check before the first
+The published package exposes two equivalent binaries:
+
+```text
+t212
+t212-cli
+```
+
+As of the latest local check, `t212-cli` was not published on npm. Re-check before the first
 publish:
 
 ```sh
-pnpm view t212 name version
+pnpm view t212-cli name version
 ```
 
 An npm `E404` means the name is still unclaimed or private/inaccessible to you.
@@ -76,8 +83,9 @@ pnpm run ci
 pnpm publish:dry-run
 ```
 
-Inspect the dry-run file list carefully. The package should include source, generated
-OpenAPI types, the vendored OpenAPI spec, README, publishing guide, and license.
+Inspect the dry-run file list carefully. The package should include `dist/` compiled
+JavaScript, the vendored OpenAPI spec, README, publishing guide, and license. It should not
+rely on TypeScript source execution from `node_modules`.
 
 If local npm commands fail with cache ownership errors, fix the npm cache ownership or
 temporarily use a clean cache for validation:
@@ -113,7 +121,7 @@ Do not add npm tokens to GitHub repository secrets for this project.
 
 On npmjs.com:
 
-1. Open the `t212` package page.
+1. Open the `t212-cli` package page.
 2. Go to `Settings`.
 3. Find `Trusted Publisher`.
 4. Choose `GitHub Actions`.

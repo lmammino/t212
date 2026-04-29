@@ -1,4 +1,4 @@
-# t212 📈
+# t212-cli 📈
 
 Unofficial Trading 212 CLI for humans and AI agents. Script your portfolio, inspect
 positions, check history, and place guarded orders from a clean JSON-first command line.
@@ -14,7 +14,7 @@ positions, check history, and place guarded orders from a clean JSON-first comma
 - 🔐 Secure credential storage with the OS keychain via `@napi-rs/keyring`.
 - 🧯 Read-only safety switch for all commands: `--read-only` or `T212_READ_ONLY=true`.
 - ✅ Write actions require deliberate confirmation with `--yes`.
-- 🧬 Strict TypeScript, ESM, Node.js 24 type stripping, Biome, Vitest, Lefthook, and CI.
+- 🧬 Strict TypeScript, ESM, compiled npm artifacts, Biome, Vitest, Lefthook, and CI.
 - 🚀 npm publishing ready with GitHub Actions OIDC Trusted Publishing.
 
 ## 🧯 Safety First
@@ -43,15 +43,17 @@ export T212_READ_ONLY=true
 - Node.js 24 or newer
 - pnpm 10 or newer
 
-This project uses strict TypeScript with Node.js type stripping. Source files avoid
-non-erasable TypeScript syntax such as enums, namespaces, decorators, and parameter
-properties.
+This project uses strict TypeScript with Node.js type stripping for local development.
+Source files avoid non-erasable TypeScript syntax such as enums, namespaces, decorators,
+and parameter properties. Published npm packages ship compiled JavaScript, so installed
+users do not depend on runtime TypeScript stripping.
 
 ## ⚡ Install
 
 ```sh
 pnpm install
 pnpm generate:types
+pnpm build
 ```
 
 Run locally:
@@ -60,10 +62,17 @@ Run locally:
 node src/cli.ts --help
 ```
 
-If linked or installed as a package, use:
+Once published, install it globally from npm:
+
+```sh
+npm install --global t212-cli
+```
+
+If linked or installed as a package, use either binary:
 
 ```sh
 t212 --help
+t212-cli --help
 ```
 
 ## 🔐 Authentication
@@ -93,6 +102,11 @@ t212 logout
 
 `login` stores credentials in the current OS credential store via `@napi-rs/keyring`
 under service `t212-cli`. Secrets are never printed by `auth status`.
+
+> [!TIP]
+> `t212 login` is generally preferred when using agents. You authenticate once, store the
+> credentials in the OS keychain, and then reuse the CLI across multiple agent sessions
+> without pasting secrets into prompts or exporting them repeatedly.
 
 > [!NOTE]
 > On some Linux systems, the desktop Secret Service backend must be available and unlocked.
@@ -183,6 +197,8 @@ pnpm lint
 pnpm format:check
 pnpm typecheck
 pnpm test
+pnpm clean
+pnpm build
 pnpm run ci
 ```
 

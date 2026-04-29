@@ -15,6 +15,12 @@ The npm package name is currently:
 t212
 ```
 
+The GitHub repository is:
+
+```text
+lmammino/t212
+```
+
 As of the latest local check, `t212` was not published on npm. Re-check before the first
 publish:
 
@@ -26,11 +32,23 @@ An npm `E404` means the name is still unclaimed or private/inaccessible to you.
 
 ## Repository Metadata
 
-npm provenance validation requires `package.json` `repository.url` to exactly match the
-GitHub repository that publishes the package. This local directory is not currently a Git
-repository, so the final URL could not be inferred.
+npm provenance validation requires `package.json` `repository.url` to match the GitHub
+repository that publishes the package. This package is configured with:
 
-After creating the GitHub repository, add the exact repository metadata:
+```json
+{
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lmammino/t212.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lmammino/t212/issues"
+  },
+  "homepage": "https://github.com/lmammino/t212#readme"
+}
+```
+
+If the GitHub repository changes, update the package metadata:
 
 ```sh
 npm pkg set repository.type=git
@@ -102,8 +120,8 @@ On npmjs.com:
 5. Enter these values:
 
 ```text
-Organization or user: OWNER
-Repository: REPO
+Organization or user: lmammino
+Repository: t212
 Workflow filename: publish.yml
 Environment name: leave blank
 ```

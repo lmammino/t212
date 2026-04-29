@@ -5,6 +5,14 @@
   "type": "module",
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lmammino/t212.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lmammino/t212/issues"
+  },
+  "homepage": "https://github.com/lmammino/t212#readme",
   "bin": {
     "t212": "bin/t212.js"
   },

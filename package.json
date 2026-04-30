@@ -1,6 +1,6 @@
 {
   "name": "t212-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Unofficial Trading 212 CLI for humans and AI agents.",
   "type": "module",
   "license": "MIT",

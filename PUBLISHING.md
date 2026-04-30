@@ -216,9 +216,33 @@ feat!: change default output schema
 
 SemVer mapping:
 
-- `fix:` creates a patch release.
-- `feat:` creates a minor release.
-- `feat!:` or a `BREAKING CHANGE:` footer creates a major release.
+- While the package is `0.x.y`, `fix:` creates a patch release.
+- While the package is `0.x.y`, `feat:` also creates a patch release.
+- While the package is `0.x.y`, `feat!:` or a `BREAKING CHANGE:` footer creates a minor release.
+- After the package reaches `1.0.0`, `fix:` creates a patch release, `feat:` creates a minor
+  release, and breaking changes create a major release.
+- `chore:`, `docs:`, `ci:`, `build:`, and similar internal-only commits do not create a
+  release PR by default.
+
+This pre-1.0 behavior is configured in `release-please-config.json`:
+
+```json
+{
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true
+}
+```
+
+Because the initial committed history uses `chore:` messages, release-please will not open
+a release PR until a user-facing Conventional Commit lands. To test the first release,
+create an explicit empty releasable commit:
+
+```sh
+git commit --allow-empty -m "fix: trigger initial release"
+git push origin main
+```
+
+Expected result from `0.1.0`: release-please opens a release PR for `0.1.1`.
 
 Normal release flow:
 

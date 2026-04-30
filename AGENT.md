@@ -181,6 +181,11 @@ source of truth. Do not add long-lived npm publish tokens to GitHub secrets for 
 project. The npm publish job uses the GitHub Environment named `npm`; npm Trusted
 Publishing must be configured with the same environment name.
 
+release-please only opens release PRs for user-facing Conventional Commits such as `fix:`,
+`feat:`, or breaking changes. Internal-only commits such as `chore:` do not create release
+PRs by default. While this package is `0.x.y`, release-please is configured so `feat:`
+bumps patch and breaking changes bump minor.
+
 ## Dependency Guidelines
 
 When adding dependencies:

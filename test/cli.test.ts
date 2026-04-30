@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { runCli } from '../src/cli/run.ts'
 import { credentialAccounts } from '../src/auth/secret-store.ts'
@@ -9,6 +10,22 @@ import {
   getRequestJsonBody,
 } from './helpers.ts'
 
+type PackageMetadata = {
+  version?: unknown
+}
+
+function getPackageVersion(): string {
+  const packageJson = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  ) as PackageMetadata
+
+  if (typeof packageJson.version !== 'string') {
+    throw new Error('Expected package.json version to be a string')
+  }
+
+  return packageJson.version
+}
+
 describe('CLI', () => {
   it('prints useful help including agent-safety flags', async () => {
     const { runtime, stdout } = createTestRuntime()
@@ -17,6 +34,13 @@ describe('CLI', () => {
     expect(stdout.value).toContain('Unofficial Trading 212 CLI')
     expect(stdout.value).toContain('--read-only')
     expect(stdout.value).toContain('orders')
+  })
+
+  it('prints the package version', async () => {
+    const { runtime, stdout } = createTestRuntime()
+
+    await expect(runCli(['node', 't212', '--version'], runtime)).resolves.toBe(0)
+    expect(stdout.value.trim()).toBe(getPackageVersion())
   })
 
   it('performs an authenticated account summary request against the selected environment', async () => {

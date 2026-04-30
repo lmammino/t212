@@ -14,15 +14,19 @@ type PackageMetadata = {
 }
 
 function getPackageVersion(): string {
-  const packageJson = JSON.parse(
-    readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
-  ) as PackageMetadata
+  try {
+    const packageJson = JSON.parse(
+      readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+    ) as PackageMetadata
 
-  if (typeof packageJson.version !== 'string' || packageJson.version.length === 0) {
+    if (typeof packageJson.version !== 'string' || packageJson.version.length === 0) {
+      return '0.0.0'
+    }
+
+    return packageJson.version
+  } catch {
     return '0.0.0'
   }
-
-  return packageJson.version
 }
 
 export function createCli(runtime: Runtime): Command {

@@ -175,9 +175,11 @@ Lefthook pre-commit runs lint, format check, typecheck, and tests. If lefthook i
 scripts were blocked by pnpm, the hooks may need to be installed manually by the user, but
 the repo config should still remain correct.
 
-Publishing is configured in `.github/workflows/publish.yml` for npm Trusted Publishing via
-GitHub Actions OIDC. Use `PUBLISHING.md` as the operational source of truth. Do not add
-long-lived npm publish tokens to GitHub secrets for this project.
+Publishing is configured in `.github/workflows/release-please.yml` with release-please and
+npm Trusted Publishing via GitHub Actions OIDC. Use `PUBLISHING.md` as the operational
+source of truth. Do not add long-lived npm publish tokens to GitHub secrets for this
+project. The npm publish job uses the GitHub Environment named `npm`; npm Trusted
+Publishing must be configured with the same environment name.
 
 ## Dependency Guidelines
 

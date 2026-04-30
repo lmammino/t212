@@ -8,6 +8,11 @@ positions, check history, and place guarded orders from a clean JSON-first comma
 > your own risk. The Trading 212 Public API is beta, and live trading actions can lose real
 > money.
 
+> [!CAUTION]
+> This CLI is still very experimental. Commands, output shape, and safety behavior may
+> change before the project is considered stable. Use it at your own risk, especially with
+> live accounts.
+
 ## ✨ Highlights
 
 - 🤖 Agent-friendly by default: deterministic JSON output and explicit subcommands.
@@ -66,6 +71,15 @@ Once published, install it globally from npm:
 
 ```sh
 npm install --global t212-cli
+```
+
+Or run it without a global install:
+
+```sh
+npx t212-cli --help
+pnpm dlx t212-cli --help
+yarn dlx t212-cli --help
+bunx t212-cli --help
 ```
 
 If linked or installed as a package, use either binary:
@@ -207,8 +221,8 @@ Lefthook runs linting, formatting checks, typechecking, and tests on commit.
 GitHub Actions runs the same checks on push and pull requests. A separate weekly workflow
 runs `pnpm audit --audit-level moderate`.
 
-Publishing is configured for npm Trusted Publishing through GitHub Actions OIDC. See
-`PUBLISHING.md` for the required npm and GitHub setup steps.
+Publishing is configured through release-please plus GitHub Actions OIDC Trusted
+Publishing. See `PUBLISHING.md` for the release and npm setup steps.
 
 > [!IMPORTANT]
 > Publishing should happen through GitHub Actions OIDC. Do not add long-lived npm publish

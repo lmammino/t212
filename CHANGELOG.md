@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/lmammino/t212/compare/v0.1.2...v0.1.3) (2026-09-23)
+
+
+### Features
+
+* add --all to history commands to follow nextPagePath ([#9](https://github.com/lmammino/t212/issues/9)) ([a56bd3a](https://github.com/lmammino/t212/commit/a56bd3a9b2109674d69a0b5e91a09dad3c53bd92))
+
 ## [0.1.2](https://github.com/lmammino/t212/compare/v0.1.1...v0.1.2) (2026-04-30)
 
 

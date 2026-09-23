@@ -185,6 +185,20 @@ t212 history exports list
 t212 history exports request --from 2026-01-01T00:00:00Z --to 2026-02-01T00:00:00Z --yes
 ```
 
+Without `--all`, history commands return a single page: the API's `{ items, nextPagePath }`
+envelope. Add `--all` to `history dividends`, `history orders`, or `history transactions`
+to follow `nextPagePath` until the last page and print every item as one JSON array:
+
+```sh
+t212 --environment demo history orders --all
+t212 history transactions --time 2026-01-01T00:00:00Z --all
+```
+
+`--all` requests 50 items per page unless `--limit` is set, and `--cursor` sets the first
+page. History endpoints are rate limited (about 6 requests per minute), so large backfills
+take a while: when a response reports no remaining quota, the CLI waits until
+`x-ratelimit-reset` before requesting the next page.
+
 > [!NOTE]
 > Deprecated pies endpoints are available under `t212 pies ...` and are marked deprecated
 > in command help. Pie mutations also require `--yes` and respect read-only mode.

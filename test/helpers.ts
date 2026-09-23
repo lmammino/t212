@@ -34,6 +34,7 @@ export type FetchCall = {
 export type TestRuntime = {
   fetchCalls: FetchCall[]
   runtime: Runtime
+  sleeps: number[]
   stderr: BufferWriter
   stdout: BufferWriter
   store: MemorySecretStore
@@ -79,6 +80,7 @@ export function createTestRuntime(
   const fetchSetup = createJsonFetch({})
   const fetchMock = options.fetch ?? fetchSetup.fetch
   const stdin = options.isTTY === undefined ? {} : { isTTY: options.isTTY }
+  const sleeps: number[] = []
 
   return {
     fetchCalls: fetchSetup.calls,
@@ -91,10 +93,14 @@ export function createTestRuntime(
         password: options.prompts?.password ?? (async () => ''),
       },
       secretStore: store,
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds)
+      },
       stderr,
       stdin,
       stdout,
     },
+    sleeps,
     stderr,
     stdout,
     store,
@@ -131,4 +137,41 @@ export async function getRequestJsonBody(call: FetchCall): Promise<unknown> {
   }
 
   return JSON.parse(body)
+}
+
+export type MockResponse = {
+  body: unknown
+  headers?: Record<string, string>
+  status?: number
+}
+
+export function createSequenceFetch(responses: MockResponse[]): {
+  calls: FetchCall[]
+  fetch: typeof fetch
+} {
+  const calls: FetchCall[] = []
+  const fetchMock: typeof fetch = async (input, init) => {
+    const response = responses[calls.length]
+    calls.push({ input, init })
+
+    if (response === undefined) {
+      throw new Error(`Unexpected fetch call #${calls.length}`)
+    }
+
+    const status = response.status ?? 200
+
+    return new Response(JSON.stringify(response.body), {
+      headers: {
+        'content-type': 'application/json',
+        ...response.headers,
+      },
+      status,
+      statusText: status >= 400 ? 'Error' : 'OK',
+    })
+  }
+
+  return {
+    calls,
+    fetch: fetchMock,
+  }
 }

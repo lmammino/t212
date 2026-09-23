@@ -1,21 +1,38 @@
 import { Command } from '@commander-js/extra-typings'
 import { parseIsoDate, parseLimit, parsePositiveInteger } from '../cli/parsers.ts'
+import type { paths } from '../generated/trading212.ts'
 import { unwrapApiResponse } from '../http/client.ts'
+import { fetchAllPages } from '../http/pagination.ts'
 import { writeResult } from '../output/format.ts'
 import type { Runtime } from '../runtime.ts'
 import { createReadContext, createWriteContext } from './context.ts'
 
 type CursorLimitTickerOptions = {
+  all?: boolean
   cursor?: number
   limit?: number
   ticker?: string
 }
 
 type TransactionsOptions = {
+  all?: boolean
   cursor?: string
   limit?: number
   time?: string
 }
+
+type DividendsQuery = NonNullable<
+  paths['/api/v0/equity/history/dividends']['get']['parameters']['query']
+>
+type HistoricalOrdersQuery = NonNullable<
+  paths['/api/v0/equity/history/orders']['get']['parameters']['query']
+>
+type TransactionsQuery = NonNullable<
+  paths['/api/v0/equity/history/transactions']['get']['parameters']['query']
+>
+
+const allPagesDescription =
+  'Follow nextPagePath until the last page and print all items as one JSON array. Uses --limit 50 unless set; waits for the rate limit to reset when needed'
 
 type ExportRequestOptions = {
   from: string
@@ -46,6 +63,7 @@ function createDividendsCommand(runtime: Runtime): Command {
     .option('--ticker <ticker>', 'Instrument ticker filter')
     .option('--cursor <cursor>', 'Pagination cursor', parsePositiveInteger)
     .option('--limit <number>', 'Page size, max 50', parseLimit)
+    .option('--all', allPagesDescription)
 
   dividends.action(async () => {
     const context = await createReadContext(dividends, runtime)
@@ -68,6 +86,24 @@ function createDividendsCommand(runtime: Runtime): Command {
       query.ticker = options.ticker
     }
 
+    if (options.all === true) {
+      const items = await fetchAllPages({
+        baseUrl: context.config.baseUrl,
+        endpointPath: '/api/v0/equity/history/dividends',
+        fetchPage: (pageQuery) =>
+          context.client.GET('/api/v0/equity/history/dividends', {
+            params: {
+              query: pageQuery as DividendsQuery,
+            },
+          }),
+        initialQuery: { limit: 50, ...query },
+        runtime,
+      })
+
+      writeResult(runtime, context.config.output, items)
+      return
+    }
+
     const result = await context.client.GET('/api/v0/equity/history/dividends', {
       params: {
         query,
@@ -86,6 +122,7 @@ function createHistoricalOrdersCommand(runtime: Runtime): Command {
     .option('--ticker <ticker>', 'Instrument ticker filter')
     .option('--cursor <cursor>', 'Pagination cursor', parsePositiveInteger)
     .option('--limit <number>', 'Page size, max 50', parseLimit)
+    .option('--all', allPagesDescription)
 
   orders.action(async () => {
     const context = await createReadContext(orders, runtime)
@@ -106,6 +143,24 @@ function createHistoricalOrdersCommand(runtime: Runtime): Command {
 
     if (options.ticker !== undefined) {
       query.ticker = options.ticker
+    }
+
+    if (options.all === true) {
+      const items = await fetchAllPages({
+        baseUrl: context.config.baseUrl,
+        endpointPath: '/api/v0/equity/history/orders',
+        fetchPage: (pageQuery) =>
+          context.client.GET('/api/v0/equity/history/orders', {
+            params: {
+              query: pageQuery as HistoricalOrdersQuery,
+            },
+          }),
+        initialQuery: { limit: 50, ...query },
+        runtime,
+      })
+
+      writeResult(runtime, context.config.output, items)
+      return
     }
 
     const result = await context.client.GET('/api/v0/equity/history/orders', {
@@ -130,6 +185,7 @@ function createTransactionsCommand(runtime: Runtime): Command {
       parseIsoDate,
     )
     .option('--limit <number>', 'Page size, max 50', parseLimit)
+    .option('--all', allPagesDescription)
 
   transactions.action(async () => {
     const context = await createReadContext(transactions, runtime)
@@ -150,6 +206,24 @@ function createTransactionsCommand(runtime: Runtime): Command {
 
     if (options.time !== undefined) {
       query.time = options.time
+    }
+
+    if (options.all === true) {
+      const items = await fetchAllPages({
+        baseUrl: context.config.baseUrl,
+        endpointPath: '/api/v0/equity/history/transactions',
+        fetchPage: (pageQuery) =>
+          context.client.GET('/api/v0/equity/history/transactions', {
+            params: {
+              query: pageQuery as TransactionsQuery,
+            },
+          }),
+        initialQuery: { limit: 50, ...query },
+        runtime,
+      })
+
+      writeResult(runtime, context.config.output, items)
+      return
     }
 
     const result = await context.client.GET('/api/v0/equity/history/transactions', {

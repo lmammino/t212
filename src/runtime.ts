@@ -1,4 +1,5 @@
 import process from 'node:process'
+import { setTimeout as delay } from 'node:timers/promises'
 import { confirm, input, password } from '@inquirer/prompts'
 import { KeyringSecretStore } from './auth/keyring-store.ts'
 
@@ -21,6 +22,7 @@ export type Runtime = {
   fetch: typeof fetch
   prompts: PromptAdapter
   secretStore: import('./auth/secret-store.ts').SecretStore
+  sleep(milliseconds: number): Promise<void>
   stderr: WritableLike
   stdin: ReadableLike
   stdout: WritableLike
@@ -36,6 +38,9 @@ export function createDefaultRuntime(): Runtime {
       password,
     },
     secretStore: new KeyringSecretStore(),
+    sleep: async (milliseconds) => {
+      await delay(milliseconds)
+    },
     stderr: process.stderr,
     stdin: process.stdin,
     stdout: process.stdout,

@@ -33,6 +33,8 @@ describe('CLI', () => {
     await expect(runCli(['node', 't212', '--help'], runtime)).resolves.toBe(0)
     expect(stdout.value).toContain('Unofficial Trading 212 CLI')
     expect(stdout.value).toContain('--read-only')
+    expect(stdout.value).toContain('--max-retries')
+    expect(stdout.value).toContain('--rate-limit-info')
     expect(stdout.value).toContain('orders')
   })
 

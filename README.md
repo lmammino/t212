@@ -142,6 +142,23 @@ For human-readable output:
 t212 --output pretty positions list
 ```
 
+Available `--output` formats:
+
+| Format         | Shape                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| `json`         | Default. Indented JSON.                                                                    |
+| `json-compact` | The same JSON on a single line.                                                            |
+| `ndjson`       | Newline-delimited JSON: arrays print one element per line (nothing for an empty array); any other value prints as one line. |
+| `pretty`       | Human-readable, not meant for parsing.                                                     |
+
+```sh
+t212 --output ndjson positions list | jq -c 'select(.quantity > 10)'
+```
+
+If the reader closes the pipe early (for example `t212 --output ndjson history orders --all | head -5`),
+the CLI stops quietly: it makes no further requests, prints nothing to stderr, and exits 0.
+Other stdout write errors are still reported and exit non-zero.
+
 ### Errors
 
 Errors go to stderr and the process exits non-zero. In JSON mode (the default, i.e. any
@@ -157,6 +174,9 @@ envelope, so agents can parse failures as reliably as results:
 - `exitCode`: same value as the process exit code.
 - `details`: extra structured data, or `null`. For `api_error` it is
   `{ status, statusText, body }`, where `body` is the parsed Trading 212 error response.
+
+When `--progress` is set, stderr also carries `{"progress":…}` lines. The error envelope is
+still exactly one line, the only one with a top-level `error` key.
 
 With `--output pretty`, errors are printed as `Error: <message>` and command-line usage
 errors keep the usual human-readable text (with suggestions and help).
@@ -177,8 +197,10 @@ errors keep the usual human-readable text (with suggestions and help).
 | `api_error`                 | 4, 5, or 1    | Trading 212 returned an error: 4 for 401/403, 5 for 404, 1 otherwise.            |
 | `credential_store_error`    | 1             | The OS credential store could not be accessed.                                   |
 | `pagination_loop`           | 1             | `--all` pagination received a `nextPagePath` it had already requested.           |
-| `invalid_next_page_path`    | 1             | `--all` pagination received a `nextPagePath` for another origin or endpoint.     |
+| `conflicting_options`       | 2             | `--next-page-path` was combined with `--cursor`, `--limit`, `--ticker`, or `--time`. |
+| `invalid_next_page_path`    | 2 or 1        | 2: `--next-page-path` is not a path on this environment and endpoint. 1: `--all` pagination received such a `nextPagePath` from the API. |
 | `pagination_limit_exceeded` | 1             | `--all` pagination hit the safety page limit.                                    |
+| `output_write_failed`       | 1             | Writing to stdout failed (other than the reader closing the pipe, which exits 0 quietly). |
 | `internal_error`            | 1             | Unexpected failure.                                                              |
 
 `--help`, `--version`, and `t212 help` print to stdout and exit `0`. Running `t212` or a
@@ -242,6 +264,46 @@ t212 history transactions --time 2026-01-01T00:00:00Z --all
 page. History endpoints are rate limited (about 6 requests per minute), so large backfills
 take a while: when a response reports no remaining quota, the CLI waits until
 `x-ratelimit-reset` before requesting the next page.
+
+With `--output ndjson`, `--all` streams: each page's items are written to stdout, one per
+line, as soon as the page arrives. An interrupted or failed run still leaves a valid partial
+NDJSON file (the error goes to stderr and the exit code is non-zero). The other formats
+collect every page first and print once. Without `--all`, `ndjson` prints the single page
+envelope `{ items, nextPagePath }` as one line so the cursor is kept.
+
+Add `--progress` to write one line per fetched page to stderr. In JSON formats it looks
+like `{"progress":{"page":3,"items":50,"total":150,"nextPagePath":"/api/v0/..."}}`
+(`nextPagePath` is `null` on the last page); in `pretty` mode it is a human-readable line.
+Nothing extra is written to stderr unless `--progress` is set.
+
+`--next-page-path <path>` starts from a `nextPagePath` printed by an earlier run, with or
+without `--all`. The path must point at the same Trading 212 environment and the same
+endpoint, so credentials are never sent elsewhere. It already encodes the query, so it
+cannot be combined with the command's `--cursor`, `--limit`, `--ticker`, or `--time` flags.
+
+Long backfill with resume (use `--output ndjson`: the other formats print nothing until the
+last page, so resuming an interrupted `json`, `json-compact`, or `pretty` run from a progress
+cursor would skip the pages it had already fetched):
+
+```sh
+t212 --environment demo --output ndjson history orders --all --progress \
+  > orders.ndjson 2> progress.log
+
+# If it was interrupted, continue from the last reported page:
+P=$(grep '"progress"' progress.log | tail -1 | jq -r '.progress.nextPagePath // empty')
+if [ -n "$P" ]; then
+  t212 --environment demo --output ndjson history orders --all --progress \
+    --next-page-path "$P" >> orders.ndjson 2>> progress.log
+else
+  echo 'Nothing to resume: the backfill finished (or no page was fetched yet).'
+fi
+```
+
+`P` is empty when the last progress line has `"nextPagePath": null` (the backfill already
+finished) or when there is no progress line yet (just rerun from the start). The
+`grep` skips any error line the failed run wrote to stderr. Each progress line is written
+right after that page's items, so a run killed between the two can repeat at most one page
+on resume; dedupe by id if that matters.
 
 > [!NOTE]
 > Deprecated pies endpoints are available under `t212 pies ...` and are marked deprecated

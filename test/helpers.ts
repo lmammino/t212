@@ -4,8 +4,9 @@ import type { PromptAdapter, Runtime, WritableLike } from '../src/runtime.ts'
 export class BufferWriter implements WritableLike {
   value = ''
 
-  write(chunk: string): boolean {
+  write(chunk: string, callback?: (error?: Error | null) => void): boolean {
     this.value += chunk
+    callback?.()
     return true
   }
 }

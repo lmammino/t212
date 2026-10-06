@@ -62,6 +62,38 @@ export function isPromptCancelled(error: unknown): boolean {
   return error instanceof Error && error.name === 'ExitPromptError'
 }
 
+/**
+ * Internal marker: stdout's reader went away (EPIPE). `runCli` maps it to a quiet exit 0
+ * and writes nothing, so `t212 ... | head` behaves like other Unix tools.
+ */
+export class OutputClosedError extends Error {
+  constructor() {
+    super('stdout was closed by the reader')
+    this.name = 'OutputClosedError'
+  }
+}
+
+export function isBrokenPipeError(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'EPIPE'
+  )
+}
+
+/** A stdout write failed for a reason other than the reader going away. */
+export function toOutputWriteError(cause: unknown): CliError {
+  return new CliError(`Failed to write output: ${toErrorMessage(cause)}`, {
+    code: 'output_write_failed',
+    details: { cause: errorCode(cause) },
+    exitCode: 1,
+  })
+}
+
+function errorCode(error: unknown): string | null {
+  const code =
+    typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : null
+  return typeof code === 'string' ? code : null
+}
+
 export function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message

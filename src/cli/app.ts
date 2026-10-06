@@ -42,7 +42,10 @@ export function createCli(runtime: Runtime): Command {
       'Trading 212 environment: demo or live. Defaults to live.',
     )
     .option('--read-only', 'Block all write actions before any network request.')
-    .option('--output <format>', 'Output format: json or pretty. Defaults to json.')
+    .option(
+      '--output <format>',
+      'Output format: json (indented), json-compact (one line), ndjson (one JSON value per line; arrays print one element per line), or pretty (human-readable). Defaults to json.',
+    )
 
   // Output routing and exit/error handling are applied to the whole tree by `runCli`.
   for (const command of createAuthCommands(runtime)) {

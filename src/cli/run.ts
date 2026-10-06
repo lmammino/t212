@@ -1,8 +1,8 @@
 import type { CommandUnknownOpts } from '@commander-js/extra-typings'
 import { CommanderError } from 'commander'
 import { createCli } from './app.ts'
-import { detectOutputFormat } from '../config/runtime-config.ts'
-import { CliError } from '../errors.ts'
+import { detectOutputFormat, type OutputFormat } from '../config/runtime-config.ts'
+import { CliError, isBrokenPipeError, OutputClosedError, toOutputWriteError } from '../errors.ts'
 import { createDefaultRuntime, type Runtime } from '../runtime.ts'
 import { isJsonOutput, writeError } from '../output/format.ts'
 
@@ -34,8 +34,20 @@ export async function runCli(
     const program = createCli(runtime)
     configureCommandTree(program, runtime, isJsonOutput(format))
     await program.parseAsync([...argv])
-    return 0
+    return exitCodeForStdoutFailure(runtime, format) ?? 0
   } catch (error) {
+    // The reader closing stdout early (e.g. `| head`) ends the command quietly with 0.
+    // This takes precedence over whatever error the interrupted command then raised.
+    const stdoutExitCode = exitCodeForStdoutFailure(runtime, format)
+
+    if (stdoutExitCode !== undefined) {
+      return stdoutExitCode
+    }
+
+    if (error instanceof OutputClosedError || isBrokenPipeError(error)) {
+      return 0
+    }
+
     // `--help`, `--version`, and `help` exit with 0 after printing to stdout. Every
     // non-zero Commander exit goes through `exitOverride` and arrives as a `UsageError`.
     if (error instanceof CommanderError && error.exitCode === 0) {
@@ -49,6 +61,26 @@ export async function runCli(
     writeError(runtime, format, error)
     return error instanceof CliError ? error.exitCode : 1
   }
+}
+
+/**
+ * Accounts for stdout errors from writes nobody awaited: EPIPE exits quietly with 0, any
+ * other stdout failure is reported as `output_write_failed` and exits 1.
+ */
+function exitCodeForStdoutFailure(runtime: Runtime, format: OutputFormat): number | undefined {
+  const failure = runtime.stdoutFailure?.()
+
+  if (failure === undefined) {
+    return undefined
+  }
+
+  if (isBrokenPipeError(failure)) {
+    return 0
+  }
+
+  const error = toOutputWriteError(failure)
+  writeError(runtime, format, error)
+  return error.exitCode
 }
 
 /**

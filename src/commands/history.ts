@@ -1,21 +1,32 @@
 import { Command } from '@commander-js/extra-typings'
 import { parseIsoDate, parseLimit, parsePositiveInteger } from '../cli/parsers.ts'
+import { type OutputFormat, resolveRuntimeConfig } from '../config/runtime-config.ts'
+import { CliError } from '../errors.ts'
 import type { paths } from '../generated/trading212.ts'
-import { unwrapApiResponse } from '../http/client.ts'
-import { fetchAllPages } from '../http/pagination.ts'
-import { writeResult } from '../output/format.ts'
+import { type ApiResult, unwrapApiResponse } from '../http/client.ts'
+import {
+  iteratePages,
+  type PageQuery,
+  type PaginatedPage,
+  parseNextPageQuery,
+} from '../http/pagination.ts'
+import { isJsonOutput, writeNdjsonItemsAsync, writeResult } from '../output/format.ts'
 import type { Runtime } from '../runtime.ts'
-import { createReadContext, createWriteContext } from './context.ts'
+import { type ApiContext, createReadContext, createWriteContext } from './context.ts'
 
-type CursorLimitTickerOptions = {
+type PaginationOptions = {
   all?: boolean
+  nextPagePath?: string
+  progress?: boolean
+}
+
+type CursorLimitTickerOptions = PaginationOptions & {
   cursor?: number
   limit?: number
   ticker?: string
 }
 
-type TransactionsOptions = {
-  all?: boolean
+type TransactionsOptions = PaginationOptions & {
   cursor?: string
   limit?: number
   time?: string
@@ -32,7 +43,13 @@ type TransactionsQuery = NonNullable<
 >
 
 const allPagesDescription =
-  'Follow nextPagePath until the last page and print all items as one JSON array. Uses --limit 50 unless set; waits for the rate limit to reset when needed'
+  'Follow nextPagePath until the last page and print all items: one JSON array, or one item per line streamed as each page arrives with --output ndjson. Uses --limit 50 unless set; waits for the rate limit to reset when needed'
+const progressDescription =
+  'After each fetched page, write a progress line to stderr with the page number, item counts, and nextPagePath. To resume an interrupted --all run from it, use --output ndjson: other formats print nothing until the last page'
+function nextPagePathDescription(conflictingFlags: readonly string[]): string {
+  const flags = conflictingFlags.join(', ')
+  return `Start from a nextPagePath printed by a previous run. Must point at this endpoint in the selected environment; cannot be combined with ${flags}`
+}
 
 type ExportRequestOptions = {
   from: string
@@ -64,53 +81,29 @@ function createDividendsCommand(runtime: Runtime): Command {
     .option('--cursor <cursor>', 'Pagination cursor', parsePositiveInteger)
     .option('--limit <number>', 'Page size, max 50', parseLimit)
     .option('--all', allPagesDescription)
+    .option('--progress', progressDescription)
+    .option('--next-page-path <path>', nextPagePathDescription(['--ticker', '--cursor', '--limit']))
 
   dividends.action(async () => {
-    const context = await createReadContext(dividends, runtime)
     const options = dividends.opts() as CursorLimitTickerOptions
-    const query: {
-      cursor?: number
-      limit?: number
-      ticker?: string
-    } = {}
 
-    if (options.cursor !== undefined) {
-      query.cursor = options.cursor
-    }
-
-    if (options.limit !== undefined) {
-      query.limit = options.limit
-    }
-
-    if (options.ticker !== undefined) {
-      query.ticker = options.ticker
-    }
-
-    if (options.all === true) {
-      const items = await fetchAllPages({
-        baseUrl: context.config.baseUrl,
-        endpointPath: '/api/v0/equity/history/dividends',
-        fetchPage: (pageQuery) =>
-          context.client.GET('/api/v0/equity/history/dividends', {
-            params: {
-              query: pageQuery as DividendsQuery,
-            },
-          }),
-        initialQuery: { limit: 50, ...query },
-        runtime,
-      })
-
-      writeResult(runtime, context.config.output, items)
-      return
-    }
-
-    const result = await context.client.GET('/api/v0/equity/history/dividends', {
-      params: {
-        query,
-      },
+    await runPaginatedHistory({
+      command: dividends,
+      endpointPath: '/api/v0/equity/history/dividends',
+      fetchPage: (context, pageQuery) =>
+        context.client.GET('/api/v0/equity/history/dividends', {
+          params: {
+            query: pageQuery as DividendsQuery,
+          },
+        }),
+      options,
+      query: definedEntries({
+        cursor: options.cursor,
+        limit: options.limit,
+        ticker: options.ticker,
+      }),
+      runtime,
     })
-
-    writeResult(runtime, context.config.output, unwrapApiResponse(result, null))
   })
 
   return dividends
@@ -123,53 +116,29 @@ function createHistoricalOrdersCommand(runtime: Runtime): Command {
     .option('--cursor <cursor>', 'Pagination cursor', parsePositiveInteger)
     .option('--limit <number>', 'Page size, max 50', parseLimit)
     .option('--all', allPagesDescription)
+    .option('--progress', progressDescription)
+    .option('--next-page-path <path>', nextPagePathDescription(['--ticker', '--cursor', '--limit']))
 
   orders.action(async () => {
-    const context = await createReadContext(orders, runtime)
     const options = orders.opts() as CursorLimitTickerOptions
-    const query: {
-      cursor?: number
-      limit?: number
-      ticker?: string
-    } = {}
 
-    if (options.cursor !== undefined) {
-      query.cursor = options.cursor
-    }
-
-    if (options.limit !== undefined) {
-      query.limit = options.limit
-    }
-
-    if (options.ticker !== undefined) {
-      query.ticker = options.ticker
-    }
-
-    if (options.all === true) {
-      const items = await fetchAllPages({
-        baseUrl: context.config.baseUrl,
-        endpointPath: '/api/v0/equity/history/orders',
-        fetchPage: (pageQuery) =>
-          context.client.GET('/api/v0/equity/history/orders', {
-            params: {
-              query: pageQuery as HistoricalOrdersQuery,
-            },
-          }),
-        initialQuery: { limit: 50, ...query },
-        runtime,
-      })
-
-      writeResult(runtime, context.config.output, items)
-      return
-    }
-
-    const result = await context.client.GET('/api/v0/equity/history/orders', {
-      params: {
-        query,
-      },
+    await runPaginatedHistory({
+      command: orders,
+      endpointPath: '/api/v0/equity/history/orders',
+      fetchPage: (context, pageQuery) =>
+        context.client.GET('/api/v0/equity/history/orders', {
+          params: {
+            query: pageQuery as HistoricalOrdersQuery,
+          },
+        }),
+      options,
+      query: definedEntries({
+        cursor: options.cursor,
+        limit: options.limit,
+        ticker: options.ticker,
+      }),
+      runtime,
     })
-
-    writeResult(runtime, context.config.output, unwrapApiResponse(result, null))
   })
 
   return orders
@@ -186,56 +155,179 @@ function createTransactionsCommand(runtime: Runtime): Command {
     )
     .option('--limit <number>', 'Page size, max 50', parseLimit)
     .option('--all', allPagesDescription)
+    .option('--progress', progressDescription)
+    .option('--next-page-path <path>', nextPagePathDescription(['--cursor', '--time', '--limit']))
 
   transactions.action(async () => {
-    const context = await createReadContext(transactions, runtime)
     const options = transactions.opts() as TransactionsOptions
-    const query: {
-      cursor?: string
-      limit?: number
-      time?: string
-    } = {}
 
-    if (options.cursor !== undefined) {
-      query.cursor = options.cursor
-    }
-
-    if (options.limit !== undefined) {
-      query.limit = options.limit
-    }
-
-    if (options.time !== undefined) {
-      query.time = options.time
-    }
-
-    if (options.all === true) {
-      const items = await fetchAllPages({
-        baseUrl: context.config.baseUrl,
-        endpointPath: '/api/v0/equity/history/transactions',
-        fetchPage: (pageQuery) =>
-          context.client.GET('/api/v0/equity/history/transactions', {
-            params: {
-              query: pageQuery as TransactionsQuery,
-            },
-          }),
-        initialQuery: { limit: 50, ...query },
-        runtime,
-      })
-
-      writeResult(runtime, context.config.output, items)
-      return
-    }
-
-    const result = await context.client.GET('/api/v0/equity/history/transactions', {
-      params: {
-        query,
-      },
+    await runPaginatedHistory({
+      command: transactions,
+      endpointPath: '/api/v0/equity/history/transactions',
+      fetchPage: (context, pageQuery) =>
+        context.client.GET('/api/v0/equity/history/transactions', {
+          params: {
+            query: pageQuery as TransactionsQuery,
+          },
+        }),
+      options,
+      query: definedEntries({
+        cursor: options.cursor,
+        limit: options.limit,
+        time: options.time,
+      }),
+      runtime,
     })
-
-    writeResult(runtime, context.config.output, unwrapApiResponse(result, null))
   })
 
   return transactions
+}
+
+type PaginatedHistoryRequest<T> = {
+  command: Command
+  endpointPath: string
+  fetchPage(context: ApiContext, query: PageQuery): Promise<ApiResult<PaginatedPage<T>>>
+  options: PaginationOptions
+  /**
+   * Query built from the user's flags (without the --all default page size). Each key maps
+   * to the `--<key>` flag, and any of them conflicts with --next-page-path.
+   */
+  query: PageQuery
+  runtime: Runtime
+}
+
+type ProgressLine = {
+  items: number
+  nextPagePath: string | null
+  page: number
+  total: number
+}
+
+async function runPaginatedHistory<T>(request: PaginatedHistoryRequest<T>): Promise<void> {
+  const { options, runtime } = request
+  const startPath = options.nextPagePath
+  let initialQuery: PageQuery
+
+  if (startPath !== undefined) {
+    const conflicting = Object.keys(request.query).map((key) => `--${key}`)
+
+    if (conflicting.length > 0) {
+      throw new CliError(
+        `--next-page-path cannot be combined with ${conflicting.join(', ')}; the path already encodes its query`,
+        { code: 'conflicting_options', exitCode: 2 },
+      )
+    }
+
+    // Validate before resolving credentials so a foreign URL never sees an auth header.
+    const { baseUrl, environment } = resolveRuntimeConfig(request.command, runtime)
+    initialQuery = parseStartPath(startPath, {
+      baseUrl,
+      endpointPath: request.endpointPath,
+      environment,
+    })
+  } else {
+    initialQuery = options.all === true ? { limit: 50, ...request.query } : request.query
+  }
+
+  const context = await createReadContext(request.command, runtime)
+  const format = context.config.output
+  const fetchPage = (query: PageQuery) => request.fetchPage(context, query)
+
+  if (options.all !== true) {
+    const result = await fetchPage(initialQuery)
+    const page = unwrapApiResponse(result, null)
+
+    // Results first, then progress, so a progress cursor never points past unwritten items.
+    writeResult(runtime, format, page)
+
+    if (options.progress === true) {
+      const items = page?.items?.length ?? 0
+      writeProgress(runtime, format, {
+        items,
+        nextPagePath: normalizeNextPagePath(page?.nextPagePath),
+        page: 1,
+        total: items,
+      })
+    }
+
+    return
+  }
+
+  const pages = iteratePages({
+    baseUrl: context.config.baseUrl,
+    endpointPath: request.endpointPath,
+    fetchPage,
+    initialQuery,
+    runtime,
+  })
+  const collected: T[] = []
+  let total = 0
+
+  for await (const chunk of pages) {
+    total += chunk.items.length
+
+    if (format === 'ndjson') {
+      // Wait for stdout to accept the page before reporting progress or fetching more.
+      await writeNdjsonItemsAsync(runtime, chunk.items)
+    } else {
+      collected.push(...chunk.items)
+    }
+
+    if (options.progress === true) {
+      writeProgress(runtime, format, {
+        items: chunk.items.length,
+        nextPagePath: chunk.nextPagePath,
+        page: chunk.page,
+        total,
+      })
+    }
+  }
+
+  if (format !== 'ndjson') {
+    writeResult(runtime, format, collected)
+  }
+}
+
+function parseStartPath(
+  path: string,
+  target: { baseUrl: string; endpointPath: string; environment: string },
+): PageQuery {
+  try {
+    return parseNextPageQuery(path, target.baseUrl, target.endpointPath)
+  } catch {
+    throw new CliError(
+      `Invalid --next-page-path for the ${target.environment} environment (${target.baseUrl}): expected a path on ${target.endpointPath}`,
+      { code: 'invalid_next_page_path', exitCode: 2 },
+    )
+  }
+}
+
+function writeProgress(runtime: Runtime, format: OutputFormat, progress: ProgressLine): void {
+  if (isJsonOutput(format)) {
+    runtime.stderr.write(`${JSON.stringify({ progress })}\n`)
+    return
+  }
+
+  const next = progress.nextPagePath === null ? 'last page' : `next: ${progress.nextPagePath}`
+  runtime.stderr.write(
+    `Page ${progress.page}: ${progress.items} items (${progress.total} total), ${next}\n`,
+  )
+}
+
+function normalizeNextPagePath(value: string | null | undefined): string | null {
+  return value === undefined || value === null || value === '' ? null : value
+}
+
+function definedEntries(values: Record<string, string | number | undefined>): PageQuery {
+  const query: PageQuery = {}
+
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined) {
+      query[key] = value
+    }
+  }
+
+  return query
 }
 
 function createExportsCommand(runtime: Runtime): Command {

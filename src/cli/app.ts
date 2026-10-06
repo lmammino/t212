@@ -44,11 +44,7 @@ export function createCli(runtime: Runtime): Command {
     .option('--read-only', 'Block all write actions before any network request.')
     .option('--output <format>', 'Output format: json or pretty. Defaults to json.')
 
-  program.configureOutput({
-    writeErr: (value) => runtime.stderr.write(value),
-    writeOut: (value) => runtime.stdout.write(value),
-  })
-
+  // Output routing and exit/error handling are applied to the whole tree by `runCli`.
   for (const command of createAuthCommands(runtime)) {
     program.addCommand(command)
   }

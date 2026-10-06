@@ -142,6 +142,46 @@ For human-readable output:
 t212 --output pretty positions list
 ```
 
+### Errors
+
+Errors go to stderr and the process exits non-zero. In JSON mode (the default, i.e. any
+`--output` other than `pretty`) stderr contains exactly one line with a JSON error
+envelope, so agents can parse failures as reliably as results:
+
+```json
+{"error":{"code":"api_error","message":"Trading 212 API request failed with HTTP 404 Not Found","exitCode":5,"details":{"status":404,"statusText":"Not Found","body":{"code":"NotFound"}}}}
+```
+
+- `code`: stable, machine-readable error code (see the table below).
+- `message`: human-readable description.
+- `exitCode`: same value as the process exit code.
+- `details`: extra structured data, or `null`. For `api_error` it is
+  `{ status, statusText, body }`, where `body` is the parsed Trading 212 error response.
+
+With `--output pretty`, errors are printed as `Error: <message>` and command-line usage
+errors keep the usual human-readable text (with suggestions and help).
+
+| Code                        | Exit code     | Meaning                                                                          |
+| --------------------------- | ------------- | -------------------------------------------------------------------------------- |
+| `usage_error`               | 2             | Unknown command/option, missing or invalid argument, or missing subcommand.      |
+| `invalid_environment`       | 2             | `--environment` / `T212_ENVIRONMENT` is not `demo` or `live`.                    |
+| `invalid_output_format`     | 2             | `--output` is not a supported format.                                            |
+| `invalid_read_only_env`     | 2             | `T212_READ_ONLY` is not a recognised boolean.                                    |
+| `missing_credentials`       | 2             | No credentials in env or the OS credential store.                                |
+| `partial_env_credentials`   | 2             | Only one of `T212_API_KEY` / `T212_API_SECRET` is set.                           |
+| `empty_credentials`         | 2             | `t212 login` was given an empty API key or secret.                               |
+| `read_only_violation`       | 3             | A write action was attempted in read-only mode.                                  |
+| `missing_yes`               | 3             | A write action needs `--yes` in a non-interactive shell.                         |
+| `write_not_confirmed`       | 3             | The interactive confirmation was declined.                                       |
+| `api_error`                 | 4, 5, or 1    | Trading 212 returned an error: 4 for 401/403, 5 for 404, 1 otherwise.            |
+| `credential_store_error`    | 1             | The OS credential store could not be accessed.                                   |
+| `pagination_loop`           | 1             | `--all` pagination received a `nextPagePath` it had already requested.           |
+| `invalid_next_page_path`    | 1             | `--all` pagination received a `nextPagePath` for another origin or endpoint.     |
+| `pagination_limit_exceeded` | 1             | `--all` pagination hit the safety page limit.                                    |
+| `internal_error`            | 1             | Unexpected failure.                                                              |
+
+`--help`, `--version`, and `t212 help` print to stdout and exit `0`.
+
 ## 🕹️ Commands
 
 Account, instruments, exchanges, and positions:

@@ -33,7 +33,11 @@ export function unwrapApiResponse<T>(result: ApiResult<T>, fallbackData: T): T {
       `Trading 212 API request failed with HTTP ${result.response.status} ${result.response.statusText}`.trim(),
       {
         code: 'api_error',
-        details: result.error,
+        details: {
+          status: result.response.status,
+          statusText: result.response.statusText,
+          body: result.error ?? null,
+        },
         exitCode: apiExitCode(result.response.status),
       },
     )

@@ -165,6 +165,7 @@ changing related code:
 - Request URL, method, query, and JSON body mapping.
 - API error formatting and exit codes.
 - JSON output shape.
+- JSON error envelope shape, pretty-mode error text, and usage-error exit codes.
 
 ## CI And Hooks
 
@@ -198,15 +199,29 @@ When adding dependencies:
 
 ## Error Handling
 
-Use `CliError` for expected user-facing errors and set an appropriate exit code:
+Use `CliError` for expected user-facing errors. Every `CliError` must have a stable
+snake_case `code` (it is part of the public automation contract) and an appropriate exit
+code:
 
-- `2`: invalid input or missing credentials/config.
+- `2`: invalid input or missing credentials/config, including Commander usage errors
+  (`usage_error`).
 - `3`: safety refusal such as read-only violation or missing `--yes`.
 - `4`: auth/permission API failures.
 - `5`: not-found API failures.
 - `1`: generic failure.
 
-Unexpected errors should still be caught at the CLI boundary and printed to stderr.
+Errors are reported once, at the CLI boundary (`src/cli/run.ts`), via `writeError`:
+
+- In JSON mode (any `--output` other than `pretty`, including the default) stderr gets
+  exactly one line: `{"error":{"code":"…","message":"…","exitCode":N,"details":…}}`.
+  `details` is `null` when absent. Commander's own error text and help-after-error are
+  suppressed in JSON mode.
+- In `pretty` mode stderr gets `Error: <message>` (usage errors keep Commander's text).
+- The output format is detected from argv before parsing, so errors raised before config
+  resolution are still emitted in the right format.
+- Unexpected (non-`CliError`) errors become `internal_error` with exit code `1`.
+- Never put API keys, secrets, auth headers, or raw credential-store errors in `message`
+  or `details`. Update the README error-code table when adding a new code.
 
 ## Documentation Requirements
 

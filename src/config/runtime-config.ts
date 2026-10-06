@@ -14,6 +14,8 @@ export type RuntimeConfig = {
   readOnly: boolean
 }
 
+export const defaultOutputFormat: OutputFormat = 'json'
+
 export type CommandWithGlobalOptions = {
   optsWithGlobals(): Record<string, unknown>
 }
@@ -26,7 +28,7 @@ export function resolveRuntimeConfig(
   const environment = parseEnvironment(
     stringOption(options.environment) ?? runtime.env.T212_ENVIRONMENT ?? 'live',
   )
-  const output = parseOutputFormat(stringOption(options.output) ?? 'json')
+  const output = parseOutputFormat(stringOption(options.output) ?? defaultOutputFormat)
   const readOnly =
     booleanOption(options.readOnly) ?? parseBooleanEnv(runtime.env.T212_READ_ONLY) ?? false
 
@@ -36,6 +38,39 @@ export function resolveRuntimeConfig(
     output,
     readOnly,
   }
+}
+
+/**
+ * Determines the output format straight from argv, before Commander parses anything, so
+ * errors raised before `resolveRuntimeConfig` runs (usage errors, invalid environment)
+ * can still be emitted in the right format.
+ *
+ * Mirrors `resolveRuntimeConfig`: the last `--output <format>` / `--output=<format>` wins
+ * and the default is JSON. Unlike `resolveRuntimeConfig` it never throws: a missing or
+ * invalid value falls back to the default (JSON) so the resulting error stays parseable.
+ */
+export function detectOutputFormat(argv: readonly string[]): OutputFormat {
+  let value: string | undefined
+  // argv[0] is the Node binary and argv[1] the script, matching Commander's default parsing.
+  const args = argv.slice(2)
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]
+
+    if (arg === '--') {
+      break
+    }
+
+    if (arg === '--output') {
+      value = args[index + 1]
+      index++
+    } else if (arg?.startsWith('--output=')) {
+      value = arg.slice('--output='.length)
+    }
+  }
+
+  const format = stringOption(value)
+  return format !== undefined && isOutputFormat(format) ? format : defaultOutputFormat
 }
 
 export function parseEnvironment(value: string): TradingEnvironment {

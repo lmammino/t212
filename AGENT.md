@@ -139,6 +139,15 @@ Known write actions include:
 When adding new endpoints, classify them as read or write before implementing the command.
 If the endpoint is not a safe GET, treat it as a write action.
 
+`history exports download <reportId>` is a read action: it only calls
+`GET /api/v0/equity/history/exports` and then fetches the report's presigned
+`downloadLink`, so it works in read-only mode. The download link must be fetched with plain
+`runtime.fetch` (so it is not rate-limit retried), never the Trading 212 client, never with
+an `Authorization` header or other credentials, and only over `https:`. Never print the full
+download URL (its query string is a bearer token); at most print its host. Writing to local
+files is not a Trading 212 write action, but existing files must not be overwritten without
+`--force`.
+
 ## CLI Design Rules
 
 - Commands should be explicit and nested by domain.

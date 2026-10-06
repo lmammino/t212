@@ -13,6 +13,7 @@ import {
 import { isJsonOutput, writeNdjsonItemsAsync, writeResult } from '../output/format.ts'
 import type { Runtime } from '../runtime.ts'
 import { type ApiContext, createReadContext, createWriteContext } from './context.ts'
+import { createExportsDownloadCommand } from './export-download.ts'
 
 type PaginationOptions = {
   all?: boolean
@@ -388,6 +389,7 @@ function createExportsCommand(runtime: Runtime): Command {
 
   exports.addCommand(list)
   exports.addCommand(request)
+  exports.addCommand(createExportsDownloadCommand(runtime))
 
   return exports
 }

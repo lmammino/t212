@@ -209,6 +209,14 @@ errors keep the usual human-readable text (with suggestions and help).
 | `invalid_next_page_path`    | 2 or 1        | 2: `--next-page-path` is not a path on this environment and endpoint. 1: `--all` pagination received such a `nextPagePath` from the API. |
 | `pagination_limit_exceeded` | 1             | `--all` pagination hit the safety page limit.                                    |
 | `output_write_failed`       | 1             | Writing to stdout failed (other than the reader closing the pipe, which exits 0 quietly). |
+| `report_not_found`          | 5             | `history exports download`: no report with that ID.                              |
+| `report_not_ready`          | 1             | `history exports download`: report is `Queued`, `Processing` or `Running`, or `Finished` without a download link yet. Retry later. |
+| `report_failed`             | 1             | `history exports download`: report is `Failed` or `Canceled` and will never be downloadable. Request a new export. |
+| `file_exists`               | 2             | `history exports download`: destination exists and `--force` was not given.      |
+| `invalid_destination`       | 2             | `history exports download`: destination directory is missing, or the destination is a directory. |
+| `invalid_download_link`     | 1             | `history exports download`: download link (or a redirect) is not a valid `https:` URL. |
+| `download_failed`           | 1             | `history exports download`: download request failed, returned a non-OK status (for example an expired link), or was interrupted. Never retried. |
+| `file_write_failed`         | 1             | `history exports download`: the report could not be written to disk.            |
 | `internal_error`            | 1             | Unexpected failure.                                                              |
 
 `--help`, `--version`, and `t212 help` print to stdout and exit `0`. Running `t212` or a
@@ -258,6 +266,40 @@ t212 history transactions --time 2026-01-01T00:00:00Z
 t212 history exports list
 t212 history exports request --from 2026-01-01T00:00:00Z --to 2026-02-01T00:00:00Z --yes
 ```
+
+Once a report is `Finished`, download its CSV:
+
+```sh
+t212 --environment demo history exports download 123456
+t212 history exports download 123456 --file reports/2026-01.csv
+t212 history exports download 123456 --file - > report.csv
+```
+
+By default the CSV is saved as `./t212-report-<reportId>.csv` and the command prints
+`{ "reportId", "path", "bytes" }` metadata. Use `--file <path>` to choose the destination
+(`--output` is the global output-format flag), `--file -` to stream the raw CSV to stdout,
+and `--force` to overwrite an existing file. Existing files are never overwritten without
+`--force`, and the destination directory must already exist. Saved files are created with
+mode `0600` (owner read/write only) regardless of your umask, because reports contain private
+account data; `--force` replaces an existing file with a new `0600` file. The command does not
+poll: rerun it once the report is ready.
+
+Errors use the codes `report_not_found` (exit 5), `report_not_ready`, `report_failed`,
+`invalid_download_link`, `download_failed`, `file_write_failed` (exit 1), and `file_exists`,
+`invalid_destination` (exit 2); see [Errors](#errors).
+
+`download` looks the report up itself via the same endpoint as `history exports list`, so a
+preceding `list` is not required. That endpoint is rate limited to about one request per
+minute, so running `list` and `download` back to back can hit HTTP 429; the lookup is a read
+and is retried like any other (see [Rate limiting](#rate-limiting)). The download link itself
+is not a Trading 212 endpoint and is never retried.
+
+Downloading is a read action, so it also works with `--read-only`.
+
+> [!NOTE]
+> The report's download link is a presigned URL. The CLI fetches it over HTTPS only
+> (including every redirect hop) and without sending your Trading 212 credentials, and never
+> prints the full link (only its host).
 
 Without `--all`, history commands return a single page: the API's `{ items, nextPagePath }`
 envelope. Add `--all` to `history dividends`, `history orders`, or `history transactions`

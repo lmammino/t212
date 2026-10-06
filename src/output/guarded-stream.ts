@@ -7,7 +7,7 @@ export type GuardedWritable = WritableLike & {
 
 type NodeWritable = {
   on(event: 'error', listener: (error: Error) => void): unknown
-  write(chunk: string, callback?: (error?: Error | null) => void): boolean
+  write(chunk: string | Uint8Array, callback?: (error?: Error | null) => void): boolean
 }
 
 /**

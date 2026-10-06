@@ -6,7 +6,7 @@ import {
 } from '../auth/credentials.ts'
 import { credentialService } from '../auth/secret-store.ts'
 import { resolveRuntimeConfig } from '../config/runtime-config.ts'
-import { CliError } from '../errors.ts'
+import { CliError, isPromptCancelled } from '../errors.ts'
 import { writeResult } from '../output/format.ts'
 import type { Runtime } from '../runtime.ts'
 
@@ -17,13 +17,7 @@ export function createAuthCommands(runtime: Runtime): Command[] {
 
   login.action(async () => {
     const config = resolveRuntimeConfig(login, runtime)
-    const apiKey = (await runtime.prompts.input({ message: 'Trading 212 API key' })).trim()
-    const apiSecret = (
-      await runtime.prompts.password({
-        mask: '*',
-        message: 'Trading 212 API secret',
-      })
-    ).trim()
+    const { apiKey, apiSecret } = await promptForCredentials(runtime)
 
     if (apiKey.length === 0 || apiSecret.length === 0) {
       throw new CliError('API key and API secret must both be provided.', {
@@ -62,4 +56,32 @@ export function createAuthCommands(runtime: Runtime): Command[] {
   auth.addCommand(status)
 
   return [login, logout, auth]
+}
+
+async function promptForCredentials(
+  runtime: Runtime,
+): Promise<{ apiKey: string; apiSecret: string }> {
+  try {
+    const apiKey = (await runtime.prompts.input({ message: 'Trading 212 API key' })).trim()
+    const apiSecret = (
+      await runtime.prompts.password({
+        mask: '*',
+        message: 'Trading 212 API secret',
+      })
+    ).trim()
+
+    return { apiKey, apiSecret }
+  } catch (error) {
+    if (isPromptCancelled(error)) {
+      throw new CliError(
+        'Login cancelled: the prompt was closed before credentials were entered.',
+        {
+          code: 'prompt_cancelled',
+          exitCode: 2,
+        },
+      )
+    }
+
+    throw error
+  }
 }

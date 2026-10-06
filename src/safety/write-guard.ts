@@ -1,4 +1,4 @@
-import { CliError } from '../errors.ts'
+import { CliError, isPromptCancelled } from '../errors.ts'
 import type { RuntimeConfig } from '../config/runtime-config.ts'
 import type { Runtime } from '../runtime.ts'
 
@@ -22,10 +22,7 @@ export async function assertWriteAllowed(options: WriteGuardOptions): Promise<vo
   }
 
   if (options.runtime.stdin.isTTY === true) {
-    const confirmed = await options.runtime.prompts.confirm({
-      default: false,
-      message: `Confirm ${options.action}?`,
-    })
+    const confirmed = await confirmWrite(options)
 
     if (confirmed) {
       return
@@ -41,4 +38,20 @@ export async function assertWriteAllowed(options: WriteGuardOptions): Promise<vo
     code: 'missing_yes',
     exitCode: 3,
   })
+}
+
+async function confirmWrite(options: WriteGuardOptions): Promise<boolean> {
+  try {
+    return await options.runtime.prompts.confirm({
+      default: false,
+      message: `Confirm ${options.action}?`,
+    })
+  } catch (error) {
+    // A cancelled confirmation prompt is treated exactly like answering "no".
+    if (isPromptCancelled(error)) {
+      return false
+    }
+
+    throw error
+  }
 }

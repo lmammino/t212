@@ -12,7 +12,7 @@ export class KeyringSecretStore implements SecretStore {
         return false
       }
 
-      throw toCredentialStoreError(error)
+      throw toCredentialStoreError()
     }
   }
 
@@ -24,15 +24,15 @@ export class KeyringSecretStore implements SecretStore {
         return null
       }
 
-      throw toCredentialStoreError(error)
+      throw toCredentialStoreError()
     }
   }
 
   async set(account: string, secret: string): Promise<void> {
     try {
       new Entry(credentialService, account).setPassword(secret)
-    } catch (error) {
-      throw toCredentialStoreError(error)
+    } catch {
+      throw toCredentialStoreError()
     }
   }
 }
@@ -41,10 +41,11 @@ function isMissingSecretError(error: unknown): boolean {
   return /not found|no entry|no matching|missing/i.test(String(error))
 }
 
-function toCredentialStoreError(error: unknown): CliError {
+// The raw keyring error is intentionally dropped: platform credential-store errors can
+// echo account names, service metadata, or other sensitive material.
+function toCredentialStoreError(): CliError {
   return new CliError('Could not access the OS credential store', {
     code: 'credential_store_error',
-    details: String(error),
     exitCode: 1,
   })
 }

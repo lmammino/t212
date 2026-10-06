@@ -225,21 +225,23 @@ describe('usage errors', () => {
     expect(stderr.value).not.toContain('Usage:')
   })
 
-  it('reports a group command without a subcommand as usage_error listing subcommands', async () => {
+  it.each([
+    [['node', 't212'], 'Usage: t212 [options] [command]'],
+    [['node', 't212', 'orders'], 'Usage: t212 orders [options] [command]'],
+    [['node', 't212', 'history', 'exports'], 'Usage: t212 history exports [options] [command]'],
+    [['node', 't212', '--output', 'json', 'orders'], 'Usage: t212 orders [options] [command]'],
+    [['node', 't212', '--output=pretty', 'orders'], 'Usage: t212 orders [options] [command]'],
+    [['node', 't212', 'help', 'bogus'], 'Usage: t212 [options] [command]'],
+  ])('shows group help on stderr for %j without a subcommand and exits 2', async (argv, usage) => {
     const { runtime, stderr, stdout } = createTestRuntime()
 
-    await expect(runCli(['node', 't212', 'orders'], runtime)).resolves.toBe(2)
+    await expect(runCli(argv, runtime)).resolves.toBe(2)
 
     expect(stdout.value).toBe('')
-    expect(parseEnvelope(stderr.value)).toEqual({
-      error: {
-        code: 'usage_error',
-        message:
-          '"t212 orders" requires a subcommand. Available subcommands: list, get, cancel, place. Run "t212 orders --help" for usage.',
-        exitCode: 2,
-        details: { command: 't212 orders', subcommands: ['list', 'get', 'cancel', 'place'] },
-      },
-    })
+    expect(stderr.value.startsWith(usage)).toBe(true)
+    expect(stderr.value).toContain('Commands:')
+    expect(stderr.value).not.toContain('{"error"')
+    expect(stderr.value).not.toContain('error:')
   })
 
   it('keeps Commander text in pretty mode, including the suggestion and help, and exits 2', async () => {
@@ -249,16 +251,6 @@ describe('usage errors', () => {
 
     expect(stderr.value).toContain("error: unknown command 'ordrs'\n(Did you mean orders?)")
     expect(stderr.value).toContain('Usage: t212')
-    expect(stderr.value).not.toContain('{"error"')
-  })
-
-  it('shows group help on stderr in pretty mode when the subcommand is missing', async () => {
-    const { runtime, stderr, stdout } = createTestRuntime()
-
-    await expect(runCli(['node', 't212', '--output=pretty', 'orders'], runtime)).resolves.toBe(2)
-
-    expect(stdout.value).toBe('')
-    expect(stderr.value).toContain('Usage: t212 orders')
     expect(stderr.value).not.toContain('{"error"')
   })
 })

@@ -163,7 +163,7 @@ errors keep the usual human-readable text (with suggestions and help).
 
 | Code                        | Exit code     | Meaning                                                                          |
 | --------------------------- | ------------- | -------------------------------------------------------------------------------- |
-| `usage_error`               | 2             | Unknown command/option, missing or invalid argument, or missing subcommand.      |
+| `usage_error`               | 2             | Unknown command/option, or a missing or invalid argument/option value.           |
 | `invalid_environment`       | 2             | `--environment` / `T212_ENVIRONMENT` is not `demo` or `live`.                    |
 | `invalid_output_format`     | 2             | `--output` is not a supported format.                                            |
 | `invalid_read_only_env`     | 2             | `T212_READ_ONLY` is not a recognised boolean.                                    |
@@ -180,7 +180,9 @@ errors keep the usual human-readable text (with suggestions and help).
 | `pagination_limit_exceeded` | 1             | `--all` pagination hit the safety page limit.                                    |
 | `internal_error`            | 1             | Unexpected failure.                                                              |
 
-`--help`, `--version`, and `t212 help` print to stdout and exit `0`.
+`--help`, `--version`, and `t212 help` print to stdout and exit `0`. Running `t212` or a
+command group such as `t212 orders` without a subcommand prints that command's help to
+stderr (in every output mode, with no JSON envelope) and exits `2`.
 
 ## 🕹️ Commands
 

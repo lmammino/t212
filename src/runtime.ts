@@ -3,9 +3,14 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { confirm, input, password } from '@inquirer/prompts'
 import { KeyringSecretStore } from './auth/keyring-store.ts'
 import { runPromptUntilInputEnds } from './runtime-prompts.ts'
+import { createGuardedWritable } from './output/guarded-stream.ts'
 
 export type WritableLike = {
-  write(chunk: string): unknown
+  /**
+   * Implementations must invoke `callback` once the chunk has been handed off (as Node
+   * streams do), because streaming output awaits it for backpressure.
+   */
+  write(chunk: string, callback?: (error?: Error | null) => void): unknown
 }
 
 export type ReadableLike = {
@@ -27,9 +32,19 @@ export type Runtime = {
   stderr: WritableLike
   stdin: ReadableLike
   stdout: WritableLike
+  /**
+   * First error reported by the real stdout stream (for example `EPIPE` once the reader has
+   * gone away), so `runCli` can still act on failures from writes nobody awaited.
+   */
+  stdoutFailure?(): Error | undefined
 }
 
 export function createDefaultRuntime(): Runtime {
+  // Guarding both streams means a closed pipe (EPIPE) can never crash the process with an
+  // uncaught 'error' event. stderr errors have nowhere to be reported, so they are dropped.
+  const stdout = createGuardedWritable(process.stdout)
+  const stderr = createGuardedWritable(process.stderr)
+
   return {
     env: process.env,
     fetch: globalThis.fetch,
@@ -45,8 +60,9 @@ export function createDefaultRuntime(): Runtime {
     sleep: async (milliseconds) => {
       await delay(milliseconds)
     },
-    stderr: process.stderr,
+    stderr,
     stdin: process.stdin,
-    stdout: process.stdout,
+    stdout,
+    stdoutFailure: stdout.failure,
   }
 }

@@ -2,7 +2,7 @@ import { CliError } from '../errors.ts'
 import type { Runtime } from '../runtime.ts'
 
 export const environments = ['demo', 'live'] as const
-export const outputFormats = ['json', 'pretty'] as const
+export const outputFormats = ['json', 'json-compact', 'ndjson', 'pretty'] as const
 
 export type TradingEnvironment = (typeof environments)[number]
 export type OutputFormat = (typeof outputFormats)[number]
@@ -89,10 +89,13 @@ export function parseOutputFormat(value: string): OutputFormat {
     return value
   }
 
-  throw new CliError(`Invalid output format "${value}". Expected json or pretty.`, {
-    code: 'invalid_output_format',
-    exitCode: 2,
-  })
+  throw new CliError(
+    `Invalid output format "${value}". Expected one of: ${outputFormats.join(', ')}.`,
+    {
+      code: 'invalid_output_format',
+      exitCode: 2,
+    },
+  )
 }
 
 export function parseBooleanEnv(value: string | undefined): boolean | undefined {

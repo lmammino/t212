@@ -50,8 +50,9 @@ Use `pnpm format` only when intentionally applying formatting changes.
 - `src/commands/`: command groups and request/payload mapping.
 - `src/auth/`: credential resolution, Basic auth header creation, and keyring adapter.
 - `src/config/`: global runtime config parsing.
-- `src/http/`: typed Trading 212 OpenAPI client wrapper.
-- `src/output/`: JSON/pretty output helpers.
+- `src/http/`: typed Trading 212 OpenAPI client wrapper and the `iteratePages` pagination
+  iterator.
+- `src/output/`: output helpers for `json`, `json-compact`, `ndjson`, and `pretty`.
 - `src/safety/`: write-action safety guard.
 - `src/generated/trading212.ts`: generated OpenAPI types. Do not edit manually.
 - `openapi/trading212.yaml`: vendored Trading 212 OpenAPI spec.
@@ -145,6 +146,18 @@ If the endpoint is not a safe GET, treat it as a write action.
 - Prefer named flags over positional arguments except for stable resource IDs.
 - Prefer deterministic JSON objects/arrays over prose output.
 - `--output pretty` is for humans; do not make it the default.
+- `json`, `json-compact`, and `ndjson` are all JSON modes (`isJsonOutput`). `ndjson` prints
+  arrays one element per line and any other value as one line.
+- stdout carries only results. Diagnostics such as `--progress` lines go to stderr and are
+  opt-in.
+- A closed stdout reader (`EPIPE`, e.g. `| head`) ends the command quietly with exit 0.
+  The default runtime guards stdout/stderr (`src/output/guarded-stream.ts`), and awaited
+  writes surface it as `OutputClosedError`, which `runCli` maps to 0 with no output. Other
+  stdout errors are reported as `output_write_failed` (exit 1) through the normal error
+  path.
+- Paginated `--all` commands must stream page items as they arrive in `ndjson` mode and
+  collect-then-print in the other modes. Any user-supplied `nextPagePath` must be validated
+  with `parseNextPageQuery` (same origin and endpoint) before credentials are resolved.
 - Use `--environment demo|live`, defaulting to live unless product requirements change.
 - README examples should prefer demo for first-time testing.
 - Deprecated Trading 212 pie endpoints should remain clearly marked deprecated in help text.
@@ -164,8 +177,9 @@ changing related code:
 - `--yes` enforcement before credential resolution.
 - Request URL, method, query, and JSON body mapping.
 - API error formatting and exit codes.
-- JSON output shape.
 - JSON error envelope shape, pretty-mode error text, and usage-error exit codes.
+- JSON output shape, including `json-compact` and `ndjson`.
+- Streaming order and partial output for paginated `--all` in `ndjson` mode.
 
 ## CI And Hooks
 

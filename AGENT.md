@@ -217,11 +217,13 @@ Use `CliError` for expected user-facing errors. Every `CliError` must have a sta
 snake_case `code` (it is part of the public automation contract) and an appropriate exit
 code:
 
+- `0`: success.
 - `2`: invalid input or missing credentials/config, including Commander usage errors
   (`usage_error`).
 - `3`: safety refusal such as read-only violation or missing `--yes`.
 - `4`: auth/permission API failures.
 - `5`: not-found API failures.
+- `6`: rate limited (HTTP 429 after read retries are exhausted, or any 429 on a write).
 - `1`: generic failure.
 
 Errors are reported once, at the CLI boundary (`src/cli/run.ts`), via `writeError`:
@@ -242,6 +244,10 @@ Errors are reported once, at the CLI boundary (`src/cli/run.ts`), via `writeErro
   `prompt_cancelled` (exit `2`). The default runtime cancels prompts when stdin ends.
 - Never put API keys, secrets, auth headers, or raw credential-store errors in `message`
   or `details`. Update the README error-code table when adding a new code.
+
+Rate-limited reads (`GET`/`HEAD`) are retried automatically in `src/http/rate-limit.ts`.
+Write actions are never auto-retried: a 429 on a write fails immediately with exit code `6`
+so an order or cancellation is never sent twice.
 
 ## Documentation Requirements
 

@@ -14,7 +14,9 @@ describe('runtime config', () => {
     expect(resolveRuntimeConfig(command({}), runtime)).toEqual({
       baseUrl: 'https://live.trading212.com',
       environment: 'live',
+      maxRetries: 3,
       output: 'json',
+      rateLimitInfo: false,
       readOnly: false,
     })
   })
@@ -41,9 +43,14 @@ describe('runtime config', () => {
   })
 
   it('parses boolean env values explicitly', () => {
-    expect(parseBooleanEnv('true')).toBe(true)
-    expect(parseBooleanEnv('0')).toBe(false)
-    expect(() => parseBooleanEnv('maybe')).toThrow('Invalid T212_READ_ONLY value')
+    expect(parseBooleanEnv('true', 'T212_READ_ONLY', 'invalid_read_only_env')).toBe(true)
+    expect(parseBooleanEnv('0', 'T212_READ_ONLY', 'invalid_read_only_env')).toBe(false)
+    expect(() => parseBooleanEnv('maybe', 'T212_READ_ONLY', 'invalid_read_only_env')).toThrow(
+      expect.objectContaining({
+        code: 'invalid_read_only_env',
+        message: expect.stringContaining('Invalid T212_READ_ONLY value'),
+      }),
+    )
   })
 })
 
@@ -61,7 +68,9 @@ describe('write guard', () => {
         config: {
           baseUrl: 'https://live.trading212.com',
           environment: 'live',
+          maxRetries: 3,
           output: 'json',
+          rateLimitInfo: false,
           readOnly: true,
         },
         runtime,
@@ -82,7 +91,9 @@ describe('write guard', () => {
         config: {
           baseUrl: 'https://live.trading212.com',
           environment: 'live',
+          maxRetries: 3,
           output: 'json',
+          rateLimitInfo: false,
           readOnly: false,
         },
         runtime,
@@ -108,7 +119,9 @@ describe('write guard', () => {
         config: {
           baseUrl: 'https://live.trading212.com',
           environment: 'live',
+          maxRetries: 3,
           output: 'json',
+          rateLimitInfo: false,
           readOnly: false,
         },
         runtime,

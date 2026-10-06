@@ -174,8 +174,13 @@ envelope, so agents can parse failures as reliably as results:
 - `exitCode`: same value as the process exit code.
 - `details`: extra structured data, or `null`. For `api_error` it is
   `{ status, statusText, body }`, where `body` is the parsed Trading 212 error response.
+  For `rate_limited` it is `{ status, statusText, body, rateLimit, retries }`, where
+  `rateLimit` holds the parsed `x-ratelimit-*` headers of the final 429 response
+  (`{ limit, period, remaining, reset, used }`, each a number or `null`) and `retries` is
+  how many retries were made before giving up.
 
-When `--progress` is set, stderr also carries `{"progress":…}` lines. The error envelope is
+When `--progress` or `--rate-limit-info` is set, stderr also carries `{"progress":…}`,
+`{"rateLimit":…}`, or `{"retry":…}` lines. The error envelope is
 still exactly one line, the only one with a top-level `error` key.
 
 With `--output pretty`, errors are printed as `Error: <message>` and command-line usage
@@ -187,6 +192,8 @@ errors keep the usual human-readable text (with suggestions and help).
 | `invalid_environment`       | 2             | `--environment` / `T212_ENVIRONMENT` is not `demo` or `live`.                    |
 | `invalid_output_format`     | 2             | `--output` is not a supported format.                                            |
 | `invalid_read_only_env`     | 2             | `T212_READ_ONLY` is not a recognised boolean.                                    |
+| `invalid_rate_limit_info_env` | 2           | `T212_RATE_LIMIT_INFO` is not a recognised boolean.                              |
+| `invalid_max_retries`       | 2             | `--max-retries` / `T212_MAX_RETRIES` is not a non-negative integer.              |
 | `missing_credentials`       | 2             | No credentials in env or the OS credential store.                                |
 | `partial_env_credentials`   | 2             | Only one of `T212_API_KEY` / `T212_API_SECRET` is set.                           |
 | `empty_credentials`         | 2             | `t212 login` was given an empty API key or secret.                               |
@@ -195,6 +202,7 @@ errors keep the usual human-readable text (with suggestions and help).
 | `missing_yes`               | 3             | A write action needs `--yes` in a non-interactive shell.                         |
 | `write_not_confirmed`       | 3             | The interactive confirmation was declined or cancelled.                          |
 | `api_error`                 | 4, 5, or 1    | Trading 212 returned an error: 4 for 401/403, 5 for 404, 1 otherwise.            |
+| `rate_limited`              | 6             | HTTP 429 after read retries were exhausted, or any 429 on a write (never retried). |
 | `credential_store_error`    | 1             | The OS credential store could not be accessed.                                   |
 | `pagination_loop`           | 1             | `--all` pagination received a `nextPagePath` it had already requested.           |
 | `conflicting_options`       | 2             | `--next-page-path` was combined with `--cursor`, `--limit`, `--ticker`, or `--time`. |
@@ -305,6 +313,41 @@ finished) or when there is no progress line yet (just rerun from the start). The
 right after that page's items, so a run killed between the two can repeat at most one page
 on resume; dedupe by id if that matters.
 
+### Rate limiting
+
+Trading 212 rate limits every endpoint, and the limits apply **per account**, regardless of
+which API key or IP address makes the request. Running several `t212` processes (or other
+tools) against the same account shares the same quota.
+
+- **Reads are retried.** When a `GET` or `HEAD` request gets HTTP 429, the CLI waits and retries it
+  up to 3 times. The wait comes from `x-ratelimit-reset` (plus 1s), then `Retry-After`
+  (both at least 1s), and otherwise exponential backoff (1s, 2s, 4s with ±20% jitter). A single request never
+  waits more than 120s in total: if the next wait would exceed that, it fails immediately.
+- **Writes are never retried.** A 429 on an order placement, cancellation, export request,
+  or pie mutation fails immediately, so an order is never sent twice automatically.
+- Use `--max-retries <n>` or `T212_MAX_RETRIES` to change the retry count (`0` disables
+  retries; the flag wins over the env var). The 120s wait budget still applies, so on
+  endpoints with long windows it decides how many retries actually happen: history
+  endpoints (6 requests per minute) wait about 61s per retry and so get at most one
+  retry, whatever `--max-retries` says.
+- When retries are exhausted (or a write is rate limited) the command exits with code `6`
+  and a `rate_limited` error (see [Errors](#errors)) whose `details` include the HTTP
+  status, response body, parsed `x-ratelimit-*` values, and the number of retries made.
+- In `--output pretty` mode a `Rate limited; retrying in 42s (1/3)` notice is printed to
+  stderr before each retry.
+
+To watch your quota, pass `--rate-limit-info` (or set `T212_RATE_LIMIT_INFO=true`). After
+every API response the CLI writes one line to **stderr**; stdout is unchanged:
+
+```sh
+t212 --environment demo --rate-limit-info account summary
+# stderr: {"rateLimit":{"limit":1,"period":5,"remaining":0,"reset":1760000005,"used":1,"endpoint":"GET /api/v0/equity/account/summary"}}
+```
+
+With `--rate-limit-info` in JSON mode, retries are also reported on stderr as
+`{"retry":{"attempt":1,"maxRetries":3,"waitMs":42000,"endpoint":"GET /api/v0/..."}}`.
+In pretty mode the quota line is human-readable instead.
+
 > [!NOTE]
 > Deprecated pies endpoints are available under `t212 pies ...` and are marked deprecated
 > in command help. Pie mutations also require `--yes` and respect read-only mode.
@@ -315,6 +358,7 @@ Global options:
 
 ```sh
 t212 --environment demo --read-only --output json account summary
+t212 --max-retries 0 --rate-limit-info account summary
 ```
 
 Environment variables:
@@ -323,6 +367,8 @@ Environment variables:
 - `T212_API_SECRET`: Trading 212 API secret
 - `T212_ENVIRONMENT`: `demo` or `live`
 - `T212_READ_ONLY`: `true`, `false`, `1`, `0`, `yes`, `no`, `on`, or `off`
+- `T212_MAX_RETRIES`: retries for rate-limited reads, a non-negative integer (default `3`)
+- `T212_RATE_LIMIT_INFO`: same values as `T212_READ_ONLY`; writes quota details to stderr
 
 ## 🛠️ Development
 

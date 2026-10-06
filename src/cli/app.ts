@@ -46,6 +46,14 @@ export function createCli(runtime: Runtime): Command {
       '--output <format>',
       'Output format: json (indented), json-compact (one line), ndjson (one JSON value per line; arrays print one element per line), or pretty (human-readable). Defaults to json.',
     )
+    .option(
+      '--max-retries <n>',
+      'Retries for rate-limited (HTTP 429) read requests; 0 disables. Writes are never retried. Defaults to 3 (env: T212_MAX_RETRIES).',
+    )
+    .option(
+      '--rate-limit-info',
+      'Write x-ratelimit-* quota details to stderr after each API response (env: T212_RATE_LIMIT_INFO).',
+    )
 
   // Output routing and exit/error handling are applied to the whole tree by `runCli`.
   for (const command of createAuthCommands(runtime)) {

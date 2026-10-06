@@ -3,6 +3,7 @@ import type { Runtime } from '../runtime.ts'
 
 export const environments = ['demo', 'live'] as const
 export const outputFormats = ['json', 'json-compact', 'ndjson', 'pretty'] as const
+export const defaultMaxRetries = 3
 
 export type TradingEnvironment = (typeof environments)[number]
 export type OutputFormat = (typeof outputFormats)[number]
@@ -10,7 +11,9 @@ export type OutputFormat = (typeof outputFormats)[number]
 export type RuntimeConfig = {
   baseUrl: string
   environment: TradingEnvironment
+  maxRetries: number
   output: OutputFormat
+  rateLimitInfo: boolean
   readOnly: boolean
 }
 
@@ -30,12 +33,27 @@ export function resolveRuntimeConfig(
   )
   const output = parseOutputFormat(stringOption(options.output) ?? defaultOutputFormat)
   const readOnly =
-    booleanOption(options.readOnly) ?? parseBooleanEnv(runtime.env.T212_READ_ONLY) ?? false
+    booleanOption(options.readOnly) ??
+    parseBooleanEnv(runtime.env.T212_READ_ONLY, 'T212_READ_ONLY', 'invalid_read_only_env') ??
+    false
+  const maxRetries = parseMaxRetries(
+    stringOption(options.maxRetries) ?? runtime.env.T212_MAX_RETRIES,
+  )
+  const rateLimitInfo =
+    booleanOption(options.rateLimitInfo) ??
+    parseBooleanEnv(
+      runtime.env.T212_RATE_LIMIT_INFO,
+      'T212_RATE_LIMIT_INFO',
+      'invalid_rate_limit_info_env',
+    ) ??
+    false
 
   return {
     baseUrl: environment === 'demo' ? 'https://demo.trading212.com' : 'https://live.trading212.com',
     environment,
+    maxRetries,
     output,
+    rateLimitInfo,
     readOnly,
   }
 }
@@ -98,7 +116,32 @@ export function parseOutputFormat(value: string): OutputFormat {
   )
 }
 
-export function parseBooleanEnv(value: string | undefined): boolean | undefined {
+export function parseMaxRetries(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') {
+    return defaultMaxRetries
+  }
+
+  const trimmed = value.trim()
+
+  if (/^\d+$/.test(trimmed)) {
+    const parsed = Number(trimmed)
+
+    if (Number.isSafeInteger(parsed)) {
+      return parsed
+    }
+  }
+
+  throw new CliError(`Invalid max retries "${value}". Expected a non-negative integer.`, {
+    code: 'invalid_max_retries',
+    exitCode: 2,
+  })
+}
+
+export function parseBooleanEnv(
+  value: string | undefined,
+  name: string,
+  code: string,
+): boolean | undefined {
   if (value === undefined) {
     return undefined
   }
@@ -113,8 +156,8 @@ export function parseBooleanEnv(value: string | undefined): boolean | undefined 
     return false
   }
 
-  throw new CliError(`Invalid T212_READ_ONLY value "${value}". Expected true or false.`, {
-    code: 'invalid_read_only_env',
+  throw new CliError(`Invalid ${name} value "${value}". Expected true or false.`, {
+    code,
     exitCode: 2,
   })
 }

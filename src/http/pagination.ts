@@ -1,6 +1,7 @@
 import { CliError } from '../errors.ts'
 import type { Runtime } from '../runtime.ts'
 import { type ApiResult, unwrapApiResponse } from './client.ts'
+import { waitForQuotaReset } from './rate-limit.ts'
 
 export type PaginatedPage<T> = {
   items?: T[]
@@ -27,7 +28,6 @@ export type PageChunk<T> = {
 
 // Upper bound so a misbehaving API cannot keep the CLI paginating forever.
 const maxPages = 10_000
-const rateLimitBufferMilliseconds = 1_000
 
 /**
  * Follows `nextPagePath` until it is null, yielding each page as soon as it arrives.
@@ -79,7 +79,7 @@ export async function* iteratePages<T>(
 
     seenQueries.add(key)
 
-    await waitForRateLimit(options.runtime, result.response)
+    await waitForQuotaReset(options.runtime, result.response)
   }
 }
 
@@ -102,21 +102,6 @@ export function parseNextPageQuery(
   }
 
   return Object.fromEntries(next.searchParams)
-}
-
-async function waitForRateLimit(runtime: Runtime, response: Response): Promise<void> {
-  const remaining = Number(response.headers.get('x-ratelimit-remaining') ?? Number.NaN)
-  const reset = Number(response.headers.get('x-ratelimit-reset') ?? Number.NaN)
-
-  if (!Number.isFinite(remaining) || remaining > 0 || !Number.isFinite(reset)) {
-    return
-  }
-
-  const waitMilliseconds = reset * 1000 - Date.now() + rateLimitBufferMilliseconds
-
-  if (waitMilliseconds > 0) {
-    await runtime.sleep(waitMilliseconds)
-  }
 }
 
 function pageQueryKey(query: PageQuery): string {

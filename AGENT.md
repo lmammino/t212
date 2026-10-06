@@ -222,6 +222,10 @@ Errors are reported once, at the CLI boundary (`src/cli/run.ts`), via `writeErro
 - The output format is detected from argv before parsing, so errors raised before config
   resolution are still emitted in the right format.
 - Unexpected (non-`CliError`) errors become `internal_error` with exit code `1`.
+- Cancelled interactive prompts (inquirer's `ExitPromptError`, matched by name via
+  `isPromptCancelled`) are expected outcomes, not `internal_error`: a cancelled write
+  confirmation is `write_not_confirmed` (exit `3`), a cancelled login prompt is
+  `prompt_cancelled` (exit `2`). The default runtime cancels prompts when stdin ends.
 - Never put API keys, secrets, auth headers, or raw credential-store errors in `message`
   or `details`. Update the README error-code table when adding a new code.
 

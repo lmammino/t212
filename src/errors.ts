@@ -54,6 +54,14 @@ export function toErrorEnvelope(error: unknown): ErrorEnvelope {
   }
 }
 
+/**
+ * True when an interactive prompt was cancelled (Ctrl+C, closed terminal, or input ended).
+ * Matches by name so inquirer is only imported by the runtime prompt adapter.
+ */
+export function isPromptCancelled(error: unknown): boolean {
+  return error instanceof Error && error.name === 'ExitPromptError'
+}
+
 export function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message

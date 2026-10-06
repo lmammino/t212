@@ -2,6 +2,7 @@ import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { confirm, input, password } from '@inquirer/prompts'
 import { KeyringSecretStore } from './auth/keyring-store.ts'
+import { runPromptUntilInputEnds } from './runtime-prompts.ts'
 
 export type WritableLike = {
   write(chunk: string): unknown
@@ -33,9 +34,12 @@ export function createDefaultRuntime(): Runtime {
     env: process.env,
     fetch: globalThis.fetch,
     prompts: {
-      confirm,
-      input,
-      password,
+      confirm: (options) =>
+        runPromptUntilInputEnds(process.stdin, (signal) => confirm(options, { signal })),
+      input: (options) =>
+        runPromptUntilInputEnds(process.stdin, (signal) => input(options, { signal })),
+      password: (options) =>
+        runPromptUntilInputEnds(process.stdin, (signal) => password(options, { signal })),
     },
     secretStore: new KeyringSecretStore(),
     sleep: async (milliseconds) => {

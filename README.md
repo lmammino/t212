@@ -170,9 +170,10 @@ errors keep the usual human-readable text (with suggestions and help).
 | `missing_credentials`       | 2             | No credentials in env or the OS credential store.                                |
 | `partial_env_credentials`   | 2             | Only one of `T212_API_KEY` / `T212_API_SECRET` is set.                           |
 | `empty_credentials`         | 2             | `t212 login` was given an empty API key or secret.                               |
+| `prompt_cancelled`          | 2             | A `t212 login` prompt was cancelled (Ctrl+C or input ended).                     |
 | `read_only_violation`       | 3             | A write action was attempted in read-only mode.                                  |
 | `missing_yes`               | 3             | A write action needs `--yes` in a non-interactive shell.                         |
-| `write_not_confirmed`       | 3             | The interactive confirmation was declined.                                       |
+| `write_not_confirmed`       | 3             | The interactive confirmation was declined or cancelled.                          |
 | `api_error`                 | 4, 5, or 1    | Trading 212 returned an error: 4 for 401/403, 5 for 404, 1 otherwise.            |
 | `credential_store_error`    | 1             | The OS credential store could not be accessed.                                   |
 | `pagination_loop`           | 1             | `--all` pagination received a `nextPagePath` it had already requested.           |

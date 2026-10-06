@@ -181,8 +181,9 @@ errors keep the usual human-readable text (with suggestions and help).
 | `internal_error`            | 1             | Unexpected failure.                                                              |
 
 `--help`, `--version`, and `t212 help` print to stdout and exit `0`. Running `t212` or a
-command group such as `t212 orders` without a subcommand prints that command's help to
-stderr (in every output mode, with no JSON envelope) and exits `2`.
+command group such as `t212 orders` without a subcommand, or asking `help` about an
+unknown command (`t212 help bogus`), prints the relevant help to stderr (in every output
+mode, with no JSON envelope) and exits `2`.
 
 ## 🕹️ Commands
 

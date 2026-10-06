@@ -12,6 +12,16 @@ vi.mock('@napi-rs/keyring', () => ({
     getPassword(): never {
       throw new Error('Platform failure for service t212-cli account api-key: raw-keyring-detail')
     }
+
+    setPassword(): never {
+      throw new Error(
+        'Platform failure for service t212-cli account api-secret: raw-keyring-detail',
+      )
+    }
+
+    deletePassword(): never {
+      throw new Error('No entry found for account api-key')
+    }
   },
 }))
 
@@ -184,6 +194,41 @@ describe('structured errors in JSON mode', () => {
     })
     expect(stderr.value).not.toContain('raw-keyring-detail')
   })
+
+  it('emits credential_store_error without the raw keyring error when storing credentials', async () => {
+    const { runtime, stderr, stdout } = createTestRuntime({
+      prompts: {
+        input: async () => 'login-key',
+        password: async () => 'login-secret',
+      },
+    })
+    runtime.secretStore = new KeyringSecretStore()
+
+    await expect(runCli(['node', 't212', 'login'], runtime)).resolves.toBe(1)
+
+    expect(stdout.value).toBe('')
+    expect(parseEnvelope(stderr.value)).toEqual({
+      error: {
+        code: 'credential_store_error',
+        message: 'Could not access the OS credential store',
+        exitCode: 1,
+        details: null,
+      },
+    })
+    expect(stderr.value).not.toContain('raw-keyring-detail')
+    expect(stderr.value).not.toContain('login-key')
+    expect(stderr.value).not.toContain('login-secret')
+  })
+
+  it('treats a missing keyring entry on logout as not deleted instead of an error', async () => {
+    const { runtime, stderr, stdout } = createTestRuntime()
+    runtime.secretStore = new KeyringSecretStore()
+
+    await expect(runCli(['node', 't212', 'logout'], runtime)).resolves.toBe(0)
+
+    expect(stderr.value).toBe('')
+    expect(JSON.parse(stdout.value)).toEqual({ deleted: false, service: 't212-cli' })
+  })
 })
 
 describe('usage errors', () => {
@@ -232,7 +277,8 @@ describe('usage errors', () => {
     [['node', 't212', '--output', 'json', 'orders'], 'Usage: t212 orders [options] [command]'],
     [['node', 't212', '--output=pretty', 'orders'], 'Usage: t212 orders [options] [command]'],
     [['node', 't212', 'help', 'bogus'], 'Usage: t212 [options] [command]'],
-  ])('shows group help on stderr for %j without a subcommand and exits 2', async (argv, usage) => {
+    [['node', 't212', 'orders', 'help', 'bogus'], 'Usage: t212 orders [options] [command]'],
+  ])('shows help on stderr for %j (missing or unknown subcommand) and exits 2', async (argv, usage) => {
     const { runtime, stderr, stdout } = createTestRuntime()
 
     await expect(runCli(argv, runtime)).resolves.toBe(2)

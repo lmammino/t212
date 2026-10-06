@@ -9,14 +9,20 @@ export function isJsonOutput(format: OutputFormat): boolean {
 }
 
 export function writeResult(runtime: Runtime, format: OutputFormat, data: unknown): void {
-  if (format === 'json') {
-    runtime.stdout.write(`${JSON.stringify(data ?? null, null, 2)}\n`)
-    return
+  // Exhaustive on purpose: a new output format must decide how results are rendered here
+  // (and stay consistent with `isJsonOutput`) instead of silently falling through.
+  switch (format) {
+    case 'json':
+      runtime.stdout.write(`${JSON.stringify(data ?? null, null, 2)}\n`)
+      return
+    case 'pretty':
+      runtime.stdout.write(
+        `${inspect(data ?? null, { colors: runtime.stdin.isTTY === true, depth: null })}\n`,
+      )
+      return
+    default:
+      format satisfies never
   }
-
-  runtime.stdout.write(
-    `${inspect(data ?? null, { colors: runtime.stdin.isTTY === true, depth: null })}\n`,
-  )
 }
 
 export function writeMessage(runtime: Runtime, message: string): void {

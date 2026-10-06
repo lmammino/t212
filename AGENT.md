@@ -216,8 +216,8 @@ Errors are reported once, at the CLI boundary (`src/cli/run.ts`), via `writeErro
   exactly one line: `{"error":{"code":"…","message":"…","exitCode":N,"details":…}}`.
   `details` is `null` when absent. Commander's own error text and help-after-error are
   suppressed in JSON mode.
-- Bare `t212` and group commands invoked without a subcommand print the command help to
-  stderr in every output mode (no envelope) and exit `2`.
+- Bare `t212` and group commands invoked without a subcommand, and `help <unknown>`, print
+  the relevant help to stderr in every output mode (no envelope) and exit `2`.
 - In `pretty` mode stderr gets `Error: <message>` (usage errors keep Commander's text).
 - The output format is detected from argv before parsing, so errors raised before config
   resolution are still emitted in the right format.

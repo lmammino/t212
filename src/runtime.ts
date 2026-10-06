@@ -10,7 +10,7 @@ export type WritableLike = {
    * Implementations must invoke `callback` once the chunk has been handed off (as Node
    * streams do), because streaming output awaits it for backpressure.
    */
-  write(chunk: string, callback?: (error?: Error | null) => void): unknown
+  write(chunk: string | Uint8Array, callback?: (error?: Error | null) => void): unknown
 }
 
 export type ReadableLike = {
@@ -24,6 +24,7 @@ export type PromptAdapter = {
 }
 
 export type Runtime = {
+  cwd(): string
   env: NodeJS.ProcessEnv
   fetch: typeof fetch
   prompts: PromptAdapter
@@ -46,6 +47,7 @@ export function createDefaultRuntime(): Runtime {
   const stderr = createGuardedWritable(process.stderr)
 
   return {
+    cwd: () => process.cwd(),
     env: process.env,
     fetch: globalThis.fetch,
     prompts: {

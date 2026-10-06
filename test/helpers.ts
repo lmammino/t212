@@ -2,10 +2,18 @@ import type { SecretStore } from '../src/auth/secret-store.ts'
 import type { PromptAdapter, Runtime, WritableLike } from '../src/runtime.ts'
 
 export class BufferWriter implements WritableLike {
-  value = ''
+  readonly chunks: Uint8Array[] = []
 
-  write(chunk: string, callback?: (error?: Error | null) => void): boolean {
-    this.value += chunk
+  get bytes(): Buffer {
+    return Buffer.concat(this.chunks)
+  }
+
+  get value(): string {
+    return this.bytes.toString('utf8')
+  }
+
+  write(chunk: string | Uint8Array, callback?: (error?: Error | null) => void): boolean {
+    this.chunks.push(typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : Buffer.from(chunk))
     callback?.()
     return true
   }
@@ -69,6 +77,7 @@ export function createJsonFetch(
 
 export function createTestRuntime(
   options: {
+    cwd?: string
     env?: NodeJS.ProcessEnv
     fetch?: typeof fetch
     isTTY?: boolean
@@ -86,6 +95,7 @@ export function createTestRuntime(
   return {
     fetchCalls: fetchSetup.calls,
     runtime: {
+      cwd: () => options.cwd ?? process.cwd(),
       env: options.env ?? {},
       fetch: fetchMock,
       prompts: {

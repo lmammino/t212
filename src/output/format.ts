@@ -73,7 +73,12 @@ export async function writeNdjsonItemsAsync(
   }
 }
 
-function writeAndWait(stream: WritableLike, chunk: string): Promise<void> {
+/**
+ * Writes a chunk and resolves once the stream has accepted it. Rejects with
+ * `OutputClosedError` when the reader has gone away (EPIPE) and with an `output_write_failed`
+ * error otherwise.
+ */
+export function writeAndWait(stream: WritableLike, chunk: string | Uint8Array): Promise<void> {
   return new Promise((resolve, reject) => {
     stream.write(chunk, (error) => {
       if (error) {
